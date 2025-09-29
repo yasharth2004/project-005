@@ -1,4 +1,6 @@
 :root {
+  /* Theme variables will be set by ThemeProvider */
+  
   /* Samsung Color Palette */
   --samsung-blue: #1428A0;
   --samsung-blue-light: #2d40b3;
@@ -132,4 +134,26 @@ button, input, textarea {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--gray-500);
+}
+
+/* Global dark mode styles */
+.dark-mode {
+  color-scheme: dark;
+}
+
+.dark-mode body {
+  background: var(--color-background);
+  color: var(--color-text-primary);
+}
+
+.dark-mode ::-webkit-scrollbar-track {
+  background: var(--color-background-secondary);
+}
+
+.dark-mode ::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+}
+
+.dark-mode ::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-hover);
 }

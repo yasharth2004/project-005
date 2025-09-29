@@ -41,42 +41,42 @@ export const samsungTheme = {
     assistantMessageBorder: '#E1E5E9',
   },
   dark: {
-    // Primary Samsung Blue (adjusted for dark mode)
-    primary: '#4A90E2',
-    primaryHover: '#5BA0F2',
-    primaryLight: '#6BB0FF',
+    // Primary Samsung Blue (Samsung One UI Dark Mode with gradients)
+    primary: 'linear-gradient(135deg, #1A73E8 0%, #2196F3 100%)',
+    primaryHover: 'linear-gradient(135deg, #2196F3 0%, #42A5F5 100%)',
+    primaryLight: 'linear-gradient(135deg, #42A5F5 0%, #64B5F6 100%)',
     
-    // Background colors (Samsung One UI Dark)
-    background: '#000000',
-    backgroundSecondary: '#0D0D0D',
-    backgroundTertiary: '#1A1A1A',
+    // Background colors (Samsung One UI Dark - Much Darker with gradients)
+    background: 'linear-gradient(135deg, #000000 0%, #0A0A0A 100%)',
+    backgroundSecondary: 'linear-gradient(135deg, #0A0A0A 0%, #111111 100%)',
+    backgroundTertiary: 'linear-gradient(135deg, #111111 0%, #1A1A1A 100%)',
     
-    // Surface colors
-    surface: '#1A1A1A',
-    surfaceElevated: '#2A2A2A',
+    // Surface colors (Darker surfaces with subtle gradients)
+    surface: 'linear-gradient(135deg, #0A0A0A 0%, #111111 100%)',
+    surfaceElevated: 'linear-gradient(135deg, #111111 0%, #1A1A1A 100%)',
     
     // Text colors
     textPrimary: '#FFFFFF',
-    textSecondary: '#B3B3B3',
-    textTertiary: '#8E8E93',
+    textSecondary: '#BBBBBB',
+    textTertiary: '#999999',
     textInverse: '#000000',
     
-    // Border colors
-    border: '#2A2A2A',
-    borderLight: '#1A1A1A',
-    borderHover: '#3A3A3A',
+    // Border colors (Much darker)
+    border: '#222222',
+    borderLight: '#111111',
+    borderHover: '#333333',
     
     // Status colors (Samsung One UI Dark variants)
     success: '#4ADB6A',
     error: '#FF6B6B',
     warning: '#FFB340',
-    info: '#4A90E2',
+    info: '#1A73E8',
     
-    // Chat specific
-    chatBackground: '#000000',
-    userMessage: '#4A90E2',
-    assistantMessage: '#1A1A1A',
-    assistantMessageBorder: '#2A2A2A',
+    // Chat specific (Darker with gradients)
+    chatBackground: 'linear-gradient(135deg, #000000 0%, #0A0A0A 100%)',
+    userMessage: 'linear-gradient(135deg, #1A73E8 0%, #2196F3 100%)',
+    assistantMessage: 'linear-gradient(135deg, #0A0A0A 0%, #111111 100%)',
+    assistantMessageBorder: '#222222',
   }
 };
 

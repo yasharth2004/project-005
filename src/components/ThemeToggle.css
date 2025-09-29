@@ -44,13 +44,25 @@
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Dark mode specific styles */
-.dark-mode .theme-toggle {
-  box-shadow: 0 2px 4px rgba(255, 255, 255, 0.1);
+/* Dark Mode Styles */
+[data-theme="dark"] .theme-toggle {
+  background: #111111;
+  border: 1px solid #222222;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-.dark-mode .theme-toggle:hover {
-  box-shadow: 0 4px 8px rgba(255, 255, 255, 0.15);
+[data-theme="dark"] .theme-toggle:hover {
+  background: #222222;
+  border-color: #333333;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .theme-toggle-icon {
+  color: #AAAAAA;
+}
+
+[data-theme="dark"] .theme-toggle:hover .theme-toggle-icon {
+  color: #1A73E8;
 }
 
 /* Focus styles for accessibility */

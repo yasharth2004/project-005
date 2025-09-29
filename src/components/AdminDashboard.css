@@ -6,23 +6,23 @@
 }
 
 .admin-dashboard h1 {
-  color: #1f2937;
+  color: var(--color-text-primary, #1f2937);
   margin-bottom: 30px;
   font-size: 2rem;
   font-weight: 700;
 }
 
 .admin-dashboard h2 {
-  color: #374151;
+  color: var(--color-text-primary, #374151);
   margin-bottom: 20px;
   font-size: 1.5rem;
   font-weight: 600;
 }
 
 .error-message {
-  background-color: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #dc2626;
+  background-color: var(--color-background-tertiary, #fef2f2);
+  border: 1px solid var(--color-border, #fecaca);
+  color: var(--color-error, #dc2626);
   padding: 12px 16px;
   border-radius: 8px;
   margin-bottom: 20px;
@@ -34,7 +34,7 @@
 .error-message button {
   background: none;
   border: none;
-  color: #dc2626;
+  color: var(--color-error, #dc2626);
   font-size: 18px;
   cursor: pointer;
   padding: 0;
@@ -44,11 +44,12 @@
 
 /* Statistics Section */
 .stats-section {
-  background: white;
+  background: var(--color-surface, white);
   border-radius: 12px;
   padding: 24px;
   margin-bottom: 30px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--color-border, transparent);
 }
 
 .stats-grid {
@@ -58,15 +59,15 @@
 }
 
 .stat-card {
-  background: #f8fafc;
+  background: var(--color-background-secondary, #f8fafc);
   border-radius: 8px;
   padding: 20px;
   text-align: center;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border, #e2e8f0);
 }
 
 .stat-card h3 {
-  color: #64748b;
+  color: var(--color-text-secondary, #64748b);
   font-size: 0.875rem;
   font-weight: 500;
   margin-bottom: 8px;
@@ -75,7 +76,7 @@
 }
 
 .stat-card p {
-  color: #1f2937;
+  color: var(--color-text-primary, #1f2937);
   font-size: 2rem;
   font-weight: 700;
   margin: 0;
@@ -83,11 +84,12 @@
 
 /* Upload Section */
 .upload-section {
-  background: white;
+  background: var(--color-surface, white);
   border-radius: 12px;
   padding: 24px;
   margin-bottom: 30px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--color-border, transparent);
 }
 
 .upload-form {
@@ -104,29 +106,31 @@
 
 .form-group label {
   font-weight: 500;
-  color: #374151;
+  color: var(--color-text-primary, #374151);
   font-size: 0.875rem;
 }
 
 .form-group input,
 .form-group select {
   padding: 10px 12px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--color-border, #d1d5db);
   border-radius: 6px;
   font-size: 0.875rem;
   transition: border-color 0.2s;
+  background-color: var(--color-surface, transparent);
+  color: var(--color-text-primary, inherit);
 }
 
 .form-group input:focus,
 .form-group select:focus {
   outline: none;
-  border-color: #3b82f6;
+  border-color: var(--color-primary, #3b82f6);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .form-group input[type="file"] {
   padding: 8px;
-  background: #f9fafb;
+  background: var(--color-background-secondary, #f9fafb);
   cursor: pointer;
 }
 
@@ -137,10 +141,11 @@
 
 /* Files Section */
 .files-section {
-  background: white;
+  background: var(--color-surface, white);
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--color-border, transparent);
 }
 
 .files-grid {
@@ -150,15 +155,15 @@
 }
 
 .file-card {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border, #e5e7eb);
   border-radius: 8px;
   padding: 16px;
-  background: #fafafa;
+  background: var(--color-background-secondary, #fafafa);
   transition: all 0.2s;
 }
 
 .file-card:hover {
-  border-color: #d1d5db;
+  border-color: var(--color-border-hover, #d1d5db);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
@@ -173,7 +178,7 @@
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-text-primary, #1f2937);
   word-break: break-word;
 }
 
@@ -213,11 +218,11 @@
 .file-details p {
   margin: 4px 0;
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--color-text-secondary, #6b7280);
 }
 
 .file-details strong {
-  color: #374151;
+  color: var(--color-text-primary, #374151);
 }
 
 .file-actions {
@@ -226,8 +231,8 @@
 }
 
 .delete-btn {
-  background: #dc2626;
-  color: white;
+  background: var(--color-error, #dc2626);
+  color: var(--color-text-inverse, white);
   border: none;
   padding: 8px 16px;
   border-radius: 6px;
@@ -253,7 +258,23 @@
   align-items: center;
   min-height: 400px;
   font-size: 1.125rem;
-  color: #6b7280;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+/* Dark mode specific styles */
+.dark-mode .stats-section,
+.dark-mode .upload-section,
+.dark-mode .files-section {
+  box-shadow: 0 1px 3px rgba(255, 255, 255, 0.05);
+}
+
+.dark-mode .file-card:hover {
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.1);
+}
+
+.dark-mode .form-group input:focus,
+.dark-mode .form-group select:focus {
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2);
 }
 
 /* Responsive Design */

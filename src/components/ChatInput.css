@@ -1,14 +1,14 @@
 .chat-input-container {
-  background-color: white;
-  border-top: 1px solid #e9ecef;
+  background-color: var(--color-surface, white);
+  border-top: 1px solid var(--color-border, #e9ecef);
   padding: 20px 24px;
 }
 
 .chat-input-wrapper {
   display: flex;
   flex-direction: column;
-  background-color: #f8f9fa;
-  border: 2px solid #e9ecef;
+  background-color: var(--color-background-secondary, #f8f9fa);
+  border: 2px solid var(--color-border, #e9ecef);
   border-radius: 24px;
   overflow: hidden;
   transition: all 0.2s ease;
@@ -16,9 +16,9 @@
 }
 
 .chat-input-wrapper:focus-within {
-  border-color: #1428A0;
+  border-color: var(--color-primary, #1428A0);
   box-shadow: 0 0 0 3px rgba(20, 40, 160, 0.1);
-  background-color: white;
+  background-color: var(--color-surface, white);
 }
 
 .chat-input-main {
@@ -39,17 +39,17 @@
   font-size: 1rem;
   line-height: 1.5;
   background: transparent;
-  color: #212529;
+  color: var(--color-text-primary, #212529);
 }
 
 .chat-input::placeholder {
-  color: #adb5bd;
+  color: var(--color-text-tertiary, #adb5bd);
 }
 
 .chat-input:disabled {
-  background-color: #f8f9fa;
+  background-color: var(--color-background-secondary, #f8f9fa);
   cursor: not-allowed;
-  color: #6c757d;
+  color: var(--color-text-secondary, #6c757d);
 }
 
 .input-actions {
@@ -67,7 +67,7 @@
   height: 36px;
   border: none;
   background-color: transparent;
-  color: #6c757d;
+  color: var(--color-text-secondary, #6c757d);
   border-radius: 50%;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -75,8 +75,8 @@
 }
 
 .file-upload-button:hover:not(:disabled) {
-  background-color: #e9ecef;
-  color: #495057;
+  background-color: var(--color-background-tertiary, #e9ecef);
+  color: var(--color-text-primary, #495057);
 }
 
 .file-upload-button:disabled {
@@ -97,7 +97,7 @@
   width: 36px;
   height: 36px;
   border: none;
-  background: linear-gradient(135deg, #1428A0 0%, #2d40b3 100%);
+  background: var(--color-primary, linear-gradient(135deg, #1428A0 0%, #2d40b3 100%));
   color: white;
   border-radius: 50%;
   cursor: pointer;
@@ -232,4 +232,13 @@
     font-size: 0.8rem;
     padding: 6px 10px;
   }
+}
+
+/* Dark mode specific adjustments */
+.dark-mode .chat-input-wrapper:focus-within {
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2);
+}
+
+.dark-mode .file-upload-button:hover:not(:disabled) {
+  background-color: var(--color-background-tertiary);
 }

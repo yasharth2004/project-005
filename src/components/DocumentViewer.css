@@ -1,8 +1,8 @@
 .document-viewer {
-  background-color: white;
+  background-color: var(--color-surface, white);
   border-radius: 0;
   border: none;
-  border-left: 1px solid #e9ecef;
+  border-left: 1px solid var(--color-border, #e9ecef);
   overflow: hidden;
   height: 100%;
   display: flex;
@@ -13,7 +13,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #adb5bd;
+  color: var(--color-text-tertiary, #adb5bd);
   font-style: italic;
   padding: 32px 24px;
   text-align: center;
@@ -23,11 +23,11 @@
 .document-viewer-title {
   padding: 20px 24px;
   margin: 0;
-  background-color: #f8f9fa;
-  border-bottom: 1px solid #e9ecef;
+  background-color: var(--color-background-secondary, #f8f9fa);
+  border-bottom: 1px solid var(--color-border, #e9ecef);
   font-size: 0.875rem;
   font-weight: 600;
-  color: #495057;
+  color: var(--color-text-secondary, #495057);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -44,14 +44,14 @@
 .document-card {
   padding: 16px;
   border-radius: 12px;
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--color-border, #e9ecef);
   transition: all 0.2s ease;
   cursor: pointer;
-  background-color: white;
+  background-color: var(--color-surface, white);
 }
 
 .document-card:hover {
-  border-color: #1428A0;
+  border-color: var(--color-primary, #1428A0);
   box-shadow: 0 4px 12px rgba(20, 40, 160, 0.1);
   transform: translateY(-2px);
 }
@@ -60,17 +60,18 @@
   margin: 0 0 8px 0;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #1428A0;
+  color: var(--color-primary, #1428A0);
   line-height: 1.4;
 }
 
 .document-excerpt {
   margin: 0 0 12px 0;
   font-size: 0.8rem;
-  color: #6c757d;
+  color: var(--color-text-secondary, #6c757d);
   line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -80,7 +81,7 @@
   justify-content: space-between;
   align-items: center;
   font-size: 0.7rem;
-  color: #adb5bd;
+  color: var(--color-text-tertiary, #adb5bd);
   margin-bottom: 8px;
 }
 
@@ -97,9 +98,9 @@
 .document-tag {
   font-size: 0.65rem;
   padding: 2px 6px;
-  background-color: #e9ecef;
+  background-color: var(--color-background-secondary, #e9ecef);
   border-radius: 8px;
-  color: #6c757d;
+  color: var(--color-text-secondary, #6c757d);
   font-weight: 500;
 }
 
@@ -111,4 +112,19 @@
 .document-tag.rag-source {
   background-color: #d4edda;
   color: #155724;
+}
+
+/* Dark mode specific styles */
+.dark-mode .document-card:hover {
+  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.2);
+}
+
+.dark-mode .document-tag.uploaded {
+  background-color: rgba(74, 144, 226, 0.2);
+  color: var(--color-primary);
+}
+
+.dark-mode .document-tag.rag-source {
+  background-color: rgba(74, 219, 106, 0.2);
+  color: var(--color-success);
 }
