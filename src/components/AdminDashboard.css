@@ -261,20 +261,52 @@
   color: var(--color-text-secondary, #6b7280);
 }
 
-/* Dark mode specific styles */
-.dark-mode .stats-section,
-.dark-mode .upload-section,
-.dark-mode .files-section {
-  box-shadow: 0 1px 3px rgba(255, 255, 255, 0.05);
+/* Dark Mode Styles */
+[data-theme="dark"] .stats-section,
+[data-theme="dark"] .upload-section,
+[data-theme="dark"] .files-section {
+  background: linear-gradient(135deg, #0A0A0A 0%, #111111 100%);
+  border: 1px solid #222222;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
-.dark-mode .file-card:hover {
-  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.1);
+[data-theme="dark"] .stat-card {
+  background: linear-gradient(135deg, #111111 0%, #1A1A1A 100%);
+  border: 1px solid #222222;
 }
 
-.dark-mode .form-group input:focus,
-.dark-mode .form-group select:focus {
-  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2);
+[data-theme="dark"] .file-card {
+  background: linear-gradient(135deg, #111111 0%, #1A1A1A 100%);
+  border: 1px solid #222222;
+}
+
+[data-theme="dark"] .file-card:hover {
+  background: linear-gradient(135deg, #1A1A1A 0%, #222222 100%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .form-group input,
+[data-theme="dark"] .form-group select {
+  background: linear-gradient(135deg, #111111 0%, #1A1A1A 100%);
+  border: 1px solid #222222;
+  color: #FFFFFF;
+}
+
+[data-theme="dark"] .form-group input:focus,
+[data-theme="dark"] .form-group select:focus {
+  border-color: #1A73E8;
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.2);
+}
+
+[data-theme="dark"] .admin-dashboard h1,
+[data-theme="dark"] .admin-dashboard h2 {
+  color: #FFFFFF;
+}
+
+[data-theme="dark"] .error-message {
+  background: linear-gradient(135deg, #2A0000 0%, #1A0000 100%);
+  border: 1px solid #FF6B6B;
+  color: #FF6B6B;
 }
 
 /* Responsive Design */

@@ -97,13 +97,18 @@
   }
 }
 
-/* Dark mode specific adjustments */
-.dark-mode .chat-interface {
-  box-shadow: 0 4px 20px rgba(255, 255, 255, 0.05);
-  background-color: var(--color-background);
-  border-color: var(--color-border);
+/* Dark Mode Styles */
+[data-theme="dark"] .chat-interface {
+  background-color: linear-gradient(135deg, #0A0A0A 0%, #111111 100%);
+  border: 1px solid #222222;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
-.dark-mode .chat-header {
-  background: var(--color-primary);
+[data-theme="dark"] .chat-header {
+  background: linear-gradient(135deg, #1A73E8 0%, #2196F3 100%);
+}
+
+[data-theme="dark"] .chat-sidebar {
+  background-color: linear-gradient(135deg, #0A0A0A 0%, #111111 100%);
+  border-left: 1px solid #222222;
 }
