@@ -234,11 +234,40 @@
   }
 }
 
-/* Dark mode specific adjustments */
-.dark-mode .chat-input-wrapper:focus-within {
-  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2);
+/* Dark Mode Styles */
+[data-theme="dark"] .chat-input-wrapper:focus-within {
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.2);
 }
 
-.dark-mode .file-upload-button:hover:not(:disabled) {
+[data-theme="dark"] .file-upload-button:hover:not(:disabled) {
   background-color: var(--color-background-tertiary);
+}
+
+[data-theme="dark"] .chat-input-container {
+  background-color: linear-gradient(135deg, #0A0A0A 0%, #111111 100%);
+}
+
+[data-theme="dark"] .input-container {
+  background: linear-gradient(135deg, #111111 0%, #1A1A1A 100%);
+  border: 1px solid #222222;
+}
+
+[data-theme="dark"] .chat-input {
+  background: transparent;
+  color: #FFFFFF;
+}
+
+[data-theme="dark"] .file-preview {
+  background: linear-gradient(135deg, #111111 0%, #1A1A1A 100%);
+  border: 1px solid #222222;
+}
+
+[data-theme="dark"] .file-preview-item {
+  background: linear-gradient(135deg, #1A1A1A 0%, #222222 100%);
+  border: 1px solid #333333;
+  color: #CCCCCC;
+}
+
+[data-theme="dark"] .input-info {
+  color: #666666;
 }
