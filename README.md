@@ -8,9 +8,12 @@ A comprehensive AI-powered chatbot system for the Samsung PRISM (PRogram for Inn
 - **AI-Powered Chatbot**: Context-aware responses using Microsoft Phi-2 model via Ollama
 - **RAG System**: Retrieval-Augmented Generation for accurate, source-based answers
 - **Admin-Based File Management**: Secure system file upload and management
-- **User Authentication**: JWT-based authentication with role-based access control
+- **Enhanced User Authentication**: JWT-based authentication with role-based access control
+- **Student Role with Worklet Integration**: Students can register with worklet IDs for personalized access
+- **Signup System**: Comprehensive registration flow with role selection and validation
+- **Dark/Light Theme Toggle**: Modern theme switching with Samsung design aesthetics
 - **Document Processing**: Support for PDF, DOCX, TXT, and image files (OCR)
-- **Real-time Chat Interface**: Modern, responsive chat UI
+- **Real-time Chat Interface**: Modern, responsive chat UI with theme support
 
 ### Admin Features
 - **System File Upload**: Upload program information, credentials, FAQs, and guidelines
@@ -20,11 +23,15 @@ A comprehensive AI-powered chatbot system for the Samsung PRISM (PRogram for Inn
 - **Document Processing**: Automatic text extraction and chunking for RAG
 
 ### User Features
+- **Flexible Registration**: Choose between Student and Admin roles during signup
+- **Worklet-Aware Access**: Students register with worklet IDs for personalized content
 - **Program Information Access**: Get answers about Samsung PRISM program
 - **Project-Specific Access**: Access personal project details and information
+- **Theme Customization**: Toggle between light and dark modes with Samsung design
 - **Chat Interface**: Natural language interaction with the AI assistant
 - **Source Attribution**: View sources used for AI responses
 - **Document Viewer**: Browse relevant documents and sources
+- **Privacy Protection**: Students see only relevant worklet-specific information
 
 ## 🏗️ Architecture
 
@@ -32,9 +39,12 @@ A comprehensive AI-powered chatbot system for the Samsung PRISM (PRogram for Inn
 - **React 18** with TypeScript for type safety
 - **Vite** for fast development and building
 - **Tailwind CSS** for modern, responsive styling
+- **Samsung Design System**: Custom theme implementation with light/dark modes
+- **Theme Context**: React context for persistent theme management
 - **Zustand** for state management
-- **React Router** for navigation
+- **React Router** for navigation with signup/login flows
 - **Axios** for API communication
+- **Lucide React** for modern iconography
 
 ### Backend (Node.js + Express + TypeScript)
 - **Express.js** with TypeScript for robust API development
@@ -51,7 +61,32 @@ A comprehensive AI-powered chatbot system for the Samsung PRISM (PRogram for Inn
 - **PDF.js** for PDF text extraction
 - **Mammoth.js** for DOCX text extraction
 
-## 📋 Prerequisites
+## � Enhanced Authentication System
+
+### User Roles
+- **Admin**: Full system access, file management, user oversight
+- **Student**: Worklet-specific access, personalized RAG responses
+- **User**: General program access (legacy role)
+
+### Signup Process
+1. **Role Selection**: Choose between Student or Admin during registration
+2. **Basic Information**: Provide name, email, and secure password
+3. **Worklet Validation**: Students must provide valid worklet IDs
+4. **Account Activation**: Immediate access upon successful registration
+
+### Worklet Integration
+- **Personalized Responses**: Students receive answers specific to their worklet
+- **Privacy Protection**: Students only see their own worklet data
+- **Query Classification**: System intelligently routes general vs. worklet-specific questions
+- **Validation System**: Real-time worklet ID verification during signup
+
+### Theme System
+- **Samsung Design Language**: Professional light and dark themes
+- **Persistent Storage**: Theme preference saved across sessions
+- **Responsive Design**: Optimized for all device sizes
+- **Accessibility**: High contrast ratios and WCAG compliance
+
+## �📋 Prerequisites
 
 ### System Requirements
 - Node.js 18+ 
@@ -129,12 +164,24 @@ BCRYPT_ROUNDS=12
 4. **Monitor Processing**: Check file processing status
 5. **Manage Users**: View and manage registered users
 
-### User Workflow
+### Student Workflow
+1. **Signup Process**: 
+   - Select "Student" role during registration
+   - Provide basic information (name, email, password)
+   - Enter valid worklet ID for verification
+   - Receive confirmation and automatic login
+2. **Personalized Access**: Access worklet-specific information and responses
+3. **Theme Customization**: Toggle between light and dark modes
+4. **Intelligent Chat**: Ask both general program and worklet-specific questions
+5. **Privacy Assurance**: Only see data relevant to your worklet
+
+### General User Workflow
 1. **Register/Login**: Create account or login with existing credentials
-2. **Access Chat**: Start chatting with the AI assistant
-3. **Ask Questions**: Get information about Samsung PRISM program
-4. **View Sources**: See which documents were used for responses
-5. **Access Project Details**: View personal project information
+2. **Theme Selection**: Choose preferred light or dark mode
+3. **Access Chat**: Start chatting with the AI assistant
+4. **Ask Questions**: Get information about Samsung PRISM program
+5. **View Sources**: See which documents were used for responses
+6. **Access Project Details**: View personal project information
 
 ### Example Queries
 - "What is Samsung PRISM program?"
@@ -152,8 +199,16 @@ samsung-prism-rag-chatbot/
 │   │   ├── AdminDashboard.tsx    # Admin interface
 │   │   ├── ChatInterface.tsx     # Chat component
 │   │   ├── DocumentViewer.tsx    # Document display
+│   │   ├── LoginForm.tsx         # Login form with theme toggle
+│   │   ├── ThemeToggle.tsx       # Theme switching component
 │   │   └── ...
 │   ├── pages/                    # Page components
+│   │   ├── LoginPage.tsx         # Login page
+│   │   ├── SignupPage.tsx        # Enhanced signup with role selection
+│   │   ├── HomePage.tsx          # Main application page
+│   │   └── AdminPage.tsx         # Admin dashboard page
+│   ├── contexts/                 # React contexts
+│   │   └── ThemeContext.tsx      # Theme management context
 │   ├── services/                 # API services
 │   ├── store/                    # State management
 │   ├── types/                    # TypeScript types
@@ -174,10 +229,12 @@ samsung-prism-rag-chatbot/
 ## 🔧 API Endpoints
 
 ### Authentication
-- `POST /api/auth/register` - User registration
+- `POST /api/auth/register` - User registration (legacy)
+- `POST /api/auth/signup` - Enhanced signup with role selection and worklet validation
 - `POST /api/auth/login` - User login
 - `GET /api/auth/me` - Get current user
 - `PUT /api/auth/profile` - Update profile
+- `POST /api/auth/validate-worklet` - Validate worklet ID for students
 
 ### Admin Management
 - `POST /api/admin/files/upload` - Upload system file
