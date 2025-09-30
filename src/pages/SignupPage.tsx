@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/api';
+import ThemeToggle from '../components/ThemeToggle';
 import type { SignupCredentials, WorkletValidationResponse } from '../types';
 import './SignupPage.css';
 
@@ -19,11 +20,14 @@ export const SignupPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isValidatingWorklet, setIsValidatingWorklet] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [accountCreated, setAccountCreated] = useState(false);
 
   const handleRoleSelection = (role: 'admin' | 'student') => {
     setCredentials(prev => ({ ...prev, role }));
     setStep('details');
     setError(null);
+    setSuccess(null);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,6 +38,7 @@ export const SignupPage: React.FC = () => {
       setCredentials(prev => ({ ...prev, [name]: value }));
     }
     setError(null);
+    setSuccess(null);
   };
 
   const handleDetailsSubmit = async (e: React.FormEvent) => {
@@ -88,6 +93,7 @@ export const SignupPage: React.FC = () => {
   const handleSignup = async () => {
     setIsLoading(true);
     setError(null);
+    setSuccess(null);
 
     try {
       const signupData = { ...credentials };
@@ -97,14 +103,22 @@ export const SignupPage: React.FC = () => {
 
       const response = await authAPI.signup(signupData);
       
-      if (response.data.message) {
-        // Successfully created account
-        navigate('/login', { 
-          state: { 
-            message: 'Account created successfully! Please log in.',
-            email: credentials.email 
-          } 
-        });
+      if (response.data.success) {
+        // Successfully created account - show success message
+        setAccountCreated(true);
+        setSuccess('Account created successfully! Redirecting to login...');
+        
+        // Wait 2 seconds to show success message, then redirect
+        setTimeout(() => {
+          navigate('/login', { 
+            state: { 
+              message: 'Account created successfully! Please log in.',
+              email: credentials.email 
+            } 
+          });
+        }, 2000);
+      } else {
+        setError('Account creation failed. Please try again.');
       }
     } catch (error: any) {
       setError(error.response?.data?.error || 'Failed to create account');
@@ -159,6 +173,15 @@ export const SignupPage: React.FC = () => {
             <div className="error-content">
               <span className="error-icon">⚠️</span>
               {error}
+            </div>
+          </div>
+        )}
+
+        {success && (
+          <div className="signup-success">
+            <div className="success-content">
+              <span className="success-icon">✅</span>
+              {success}
             </div>
           </div>
         )}
@@ -231,8 +254,21 @@ export const SignupPage: React.FC = () => {
           <button
             type="submit"
             className="btn-primary"
+            disabled={isLoading || accountCreated}
           >
-            {credentials.role === 'student' ? 'Next: Verify Worklet' : 'Create Account'}
+            {accountCreated ? (
+              <>
+                <span className="success-icon">✅</span>
+                Account Created Successfully!
+              </>
+            ) : isLoading ? (
+              <>
+                <span className="loading-spinner"></span>
+                Creating Account...
+              </>
+            ) : (
+              credentials.role === 'student' ? 'Next: Verify Worklet' : 'Create Account'
+            )}
           </button>
         </div>
       </form>
@@ -252,6 +288,15 @@ export const SignupPage: React.FC = () => {
             <div className="error-content">
               <span className="error-icon">⚠️</span>
               {error}
+            </div>
+          </div>
+        )}
+
+        {success && (
+          <div className="signup-success">
+            <div className="success-content">
+              <span className="success-icon">✅</span>
+              {success}
             </div>
           </div>
         )}
@@ -308,9 +353,14 @@ export const SignupPage: React.FC = () => {
               type="button"
               className="btn-primary"
               onClick={handleSignup}
-              disabled={isLoading}
+              disabled={isLoading || accountCreated}
             >
-              {isLoading ? (
+              {accountCreated ? (
+                <>
+                  <span className="success-icon">✅</span>
+                  Account Created Successfully!
+                </>
+              ) : isLoading ? (
                 <>
                   <span className="loading-spinner"></span>
                   Creating Account...
@@ -330,6 +380,8 @@ export const SignupPage: React.FC = () => {
               setStep('details');
               setWorkletValidation(null);
               setError(null);
+              setSuccess(null);
+              setAccountCreated(false);
             }}
           >
             Back
@@ -341,6 +393,11 @@ export const SignupPage: React.FC = () => {
 
   return (
     <div className="signup-container">
+      {/* Theme Toggle positioned in top-right */}
+      <div className="signup-theme-toggle">
+        <ThemeToggle />
+      </div>
+      
       <div className="signup-card">
         {/* Header with Logo */}
         <div className="signup-logo">

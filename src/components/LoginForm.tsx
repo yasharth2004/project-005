@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import ThemeToggle from './ThemeToggle';
 import type { LoginCredentials } from '../types';
 import './LoginForm.css';
 
@@ -39,6 +40,11 @@ export const LoginForm: React.FC = () => {
 
   return (
     <div className="login-container">
+      {/* Theme Toggle positioned in top-right */}
+      <div className="login-theme-toggle">
+        <ThemeToggle />
+      </div>
+      
       <div className="login-card">
         {/* Header with Logo */}
         <div className="login-header">

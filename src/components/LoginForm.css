@@ -7,6 +7,15 @@
     align-items: center;
     justify-content: center;
     padding: 24px;
+    position: relative;
+  }
+
+  /* Theme Toggle positioned in top-right */
+  .login-theme-toggle {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    z-index: 1000;
   }
   
   .login-card {
@@ -321,6 +330,11 @@
   @media (max-width: 480px) {
     .login-card {
       padding: 24px 20px;
+    }
+    
+    .login-theme-toggle {
+      top: 16px;
+      right: 16px;
     }
     
     .demo-list {

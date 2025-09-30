@@ -8,6 +8,15 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
+  position: relative;
+}
+
+/* Theme Toggle positioned in top-right */
+.signup-theme-toggle {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 1000;
 }
 
 .signup-card {
@@ -508,6 +517,11 @@
   .signup-progress {
     flex-wrap: wrap;
     justify-content: center;
+  }
+
+  .signup-theme-toggle {
+    top: 16px;
+    right: 16px;
   }
 
   .progress-step:not(:last-child)::after {
