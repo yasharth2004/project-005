@@ -5,6 +5,7 @@ import { useAuthStore } from './store/authStore';
 import { ThemeProvider } from './contexts/ThemeContext';
 import HomePage from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
+import { SignupPage } from './pages/SignupPage';
 import AdminPage from './pages/AdminPage';
 
 function App() {
@@ -23,11 +24,18 @@ function App() {
     <ThemeProvider>
       <Router>
         <Routes>
-          {/* Public route - Login */}
+          {/* Public routes */}
           <Route 
             path="/login" 
             element={
               isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />
+            } 
+          />
+          
+          <Route 
+            path="/signup" 
+            element={
+              isAuthenticated ? <Navigate to="/" replace /> : <SignupPage />
             } 
           />
           

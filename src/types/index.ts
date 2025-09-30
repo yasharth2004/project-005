@@ -45,9 +45,10 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'user';
+  role: 'admin' | 'user' | 'student';
   avatar?: string;
   prismUID?: string;
+  workletId?: string;
 }
 
 // Search result with relevance
@@ -138,13 +139,6 @@ export interface PrismApiResponse<T> {
   message?: string;
 }
 
-export interface User {
-  id: string;
-  email: string;
-  name: string;
-  avatar?: string;
-}
-
 export interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
@@ -155,4 +149,23 @@ export interface AuthState {
 export interface LoginCredentials {
   email: string;
   password: string;
+}
+
+export interface SignupCredentials {
+  name: string;
+  email: string;
+  password: string;
+  role: 'admin' | 'student';
+  workletId?: string;
+}
+
+export interface WorkletValidationResponse {
+  valid: boolean;
+  workletDetails?: {
+    id: string;
+    title: string;
+    description?: string;
+    mentor?: string;
+  };
+  error?: string;
 }

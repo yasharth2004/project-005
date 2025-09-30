@@ -1,15 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import type { LoginCredentials } from '../types';
 import './LoginForm.css';
 
 export const LoginForm: React.FC = () => {
+  const location = useLocation();
   const [credentials, setCredentials] = useState<LoginCredentials>({
     email: '',
     password: ''
   });
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const { login, isLoading, error, clearError } = useAuthStore();
+
+  useEffect(() => {
+    // Check for success message from signup
+    if (location.state?.message) {
+      setSuccessMessage(location.state.message);
+      // Pre-fill email if provided
+      if (location.state.email) {
+        setCredentials(prev => ({ ...prev, email: location.state.email }));
+      }
+    }
+  }, [location.state]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,6 +34,7 @@ export const LoginForm: React.FC = () => {
     const { name, value } = e.target;
     setCredentials(prev => ({ ...prev, [name]: value }));
     if (error) clearError();
+    if (successMessage) setSuccessMessage(null);
   };
 
   return (
@@ -37,6 +52,15 @@ export const LoginForm: React.FC = () => {
 
         {/* Login Form */}
         <form className="login-form" onSubmit={handleSubmit}>
+          {successMessage && (
+            <div className="login-success">
+              <div className="success-content">
+                <span className="success-icon">✅</span>
+                {successMessage}
+              </div>
+            </div>
+          )}
+          
           {error && (
             <div className="login-error">
               <div className="error-content">
@@ -96,7 +120,19 @@ export const LoginForm: React.FC = () => {
           <div className="demo-list">
             <span>admin@prism.com / admin123 (Admin)</span>
             <span>user@test.com / password123 (User)</span>
+            <span>student@prism.com / student123 (Student - Worklet 025)</span>
+            <span>student75@prism.com / student123 (Student - Worklet 075)</span>
           </div>
+        </div>
+
+        {/* Signup Link */}
+        <div className="signup-section">
+          <p className="signup-text">
+            Don't have an account?{' '}
+            <a href="/signup" className="signup-link">
+              Create one here
+            </a>
+          </p>
         </div>
       </div>
 

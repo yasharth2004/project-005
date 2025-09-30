@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { User, IUser } from '../models/User';
 import { generateToken } from '../utils/jwt';
+import { WorkletService } from '../services/workletService';
 
 // @desc    Register user
 // @route   POST /api/auth/register
@@ -45,6 +46,158 @@ export const register = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: 'Server error during registration'
+    });
+  }
+};
+
+// @desc    Signup user with role and worklet validation
+// @route   POST /api/auth/signup
+// @access  Public
+export const signup = async (req: Request, res: Response) => {
+  try {
+    const { name, email, password, role, workletId } = req.body;
+
+    // Validate input
+    if (!name || !email || !password || !role) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide name, email, password, and role'
+      });
+    }
+
+    // Validate role
+    if (!['user', 'admin', 'student'].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid role. Must be user, admin, or student'
+      });
+    }
+
+    // Validate worklet ID for students
+    if (role === 'student') {
+      if (!workletId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Worklet ID is required for students'
+        });
+      }
+
+      // Validate worklet ID exists in system
+      const workletInfo = await WorkletService.validateWorkletId(workletId);
+      if (!workletInfo.found) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid worklet ID. Please check with your mentor.'
+        });
+      }
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        error: 'User with this email already exists'
+      });
+    }
+
+    // Check if worklet ID is already taken by another student
+    if (role === 'student' && workletId) {
+      const existingWorkletUser = await User.findOne({ workletId });
+      if (existingWorkletUser) {
+        return res.status(400).json({
+          success: false,
+          error: 'This worklet ID is already assigned to another student'
+        });
+      }
+    }
+
+    // Create user
+    const userData: any = {
+      name,
+      email,
+      password,
+      role
+    };
+
+    if (role === 'student' && workletId) {
+      userData.workletId = workletId;
+    }
+
+    const user = await User.create(userData);
+
+    // Generate token
+    const token = generateToken(user);
+
+    res.status(201).json({
+      success: true,
+      data: {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          workletId: user.workletId
+        },
+        token
+      }
+    });
+  } catch (error) {
+    console.error('Signup error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Server error during signup'
+    });
+  }
+};
+
+// @desc    Verify worklet ID
+// @route   POST /api/auth/verify-worklet
+// @access  Public
+export const verifyWorklet = async (req: Request, res: Response) => {
+  try {
+    const { workletId } = req.body;
+
+    if (!workletId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Worklet ID is required'
+      });
+    }
+
+    // Validate worklet ID
+    const workletInfo = await WorkletService.validateWorkletId(workletId);
+
+    if (!workletInfo.found) {
+      return res.status(200).json({
+        valid: false,
+        error: 'Worklet ID not found in system. Please check your worklet ID and try again.'
+      });
+    }
+
+    // Check if worklet ID is already taken
+    const existingUser = await User.findOne({ workletId: workletInfo.workletId });
+    if (existingUser) {
+      return res.status(200).json({
+        valid: false,
+        error: 'This worklet ID is already assigned to another student'
+      });
+    }
+
+    res.json({
+      valid: true,
+      workletDetails: {
+        id: workletInfo.workletId,
+        title: workletInfo.title,
+        description: workletInfo.description,
+        mentor: workletInfo.mentor
+      }
+    });
+  } catch (error) {
+    console.error('Worklet verification error:', error);
+    res.status(200).json({
+      valid: false,
+      error: 'Server error during worklet verification. Please try again.'
     });
   }
 };

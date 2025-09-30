@@ -47,6 +47,12 @@ export const authAPI = {
   register: (data: { name: string; email: string; password: string }) =>
     api.post('/auth/register', data),
   
+  signup: (data: { name: string; email: string; password: string; role: string; workletId?: string }) =>
+    api.post('/auth/signup', data),
+  
+  verifyWorklet: (data: { workletId: string }) =>
+    api.post('/auth/verify-worklet', data),
+  
   login: (data: { email: string; password: string }) =>
     api.post('/auth/login', data),
   

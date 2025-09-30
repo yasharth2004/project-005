@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { Document, IDocument } from '../models/Document';
 import { vectorStore, VectorSearchResult } from './vectorStore';
+import { WorkletService } from './workletService';
 import { 
   searchProjects, 
   searchExactProject,
@@ -115,7 +116,13 @@ export const searchDocuments = async (
 export const generateResponse = async (
   query: string,
   relevantDocs: SearchResult[],
-  projectResults?: ProjectSearchResult[]
+  projectResults?: ProjectSearchResult[],
+  userContext?: { user: any; workletInfo?: any },
+  queryClassification?: {
+    isWorkletQuery: boolean;
+    isPersonalWorkletQuery: boolean;
+    isGeneralProgramQuery: boolean;
+  }
 ): Promise<string> => {
   try {
     console.log('🤖 Generating response with Ollama API');
@@ -145,8 +152,11 @@ export const generateResponse = async (
       hasContent = true;
     }
 
-    // Add project data if available
-    if (projectResults && projectResults.length > 0) {
+    // Add project data if available - BUT NOT for general program queries
+    const { isGeneralProgramQuery } = queryClassification || { isGeneralProgramQuery: false };
+    
+    if (projectResults && projectResults.length > 0 && !isGeneralProgramQuery) {
+      console.log('📊 Adding project context to response (not a general program query)');
       const projectContext = formatProjectResultsForRAG(projectResults.slice(0, 5));
       if (projectContext) {
         if (hasContent) {
@@ -155,14 +165,128 @@ export const generateResponse = async (
         context += projectContext;
         hasContent = true;
       }
+    } else if (projectResults && projectResults.length > 0 && isGeneralProgramQuery) {
+      console.log('🚫 Skipping project context for general program query - using documents only');
     }
 
     if (hasContent) {
-      // Check if this is a specific worklet query
-      const isWorkletQuery = query.toLowerCase().includes('worklet') && query.match(/\b0*(\d{1,3})\b/);
+      // Use the passed query classification
+      const { isWorkletQuery, isPersonalWorkletQuery, isGeneralProgramQuery } = queryClassification || {
+        isWorkletQuery: false,
+        isPersonalWorkletQuery: false,
+        isGeneralProgramQuery: true // Default to general for safety
+      };
       
-      if (isWorkletQuery && projectResults && projectResults.length > 0) {
-        prompt = `You are the Samsung PRISM AI Assistant. Provide detailed information about the requested worklet using ONLY the provided context.
+      console.log(`🔍 Prompt Selection - Query: "${query}"`);
+      console.log(`🔍 IsWorkletQuery: ${isWorkletQuery}`);
+      console.log(`🔍 IsPersonalWorkletQuery: ${isPersonalWorkletQuery}`);
+      console.log(`🔍 IsGeneralProgramQuery: ${isGeneralProgramQuery}`);
+      console.log(`🔍 User role: ${userContext?.user?.role}`);
+      console.log(`🔍 Has project results: ${projectResults && projectResults.length > 0}`);
+      console.log(`🔍 Has relevant docs: ${relevantDocs.length > 0}`);
+      
+      // Check if student is asking about a different worklet ID
+      if (userContext?.user?.role === 'student' && isWorkletQuery && !isPersonalWorkletQuery) {
+        const workletIdMatch = query.match(/\b0*(\d{1,3})\b/);
+        if (workletIdMatch) {
+          const queryWorkletId = workletIdMatch[1].padStart(3, '0');
+          const studentWorkletId = userContext.user.workletId?.padStart(3, '0');
+          
+          console.log(`🔍 Privacy check - Query: "${query}"`);
+          console.log(`🔍 IsWorkletQuery: ${isWorkletQuery}`);
+          console.log(`🔍 IsPersonalWorkletQuery: ${isPersonalWorkletQuery}`);
+          console.log(`🔍 QueryWorkletId: ${queryWorkletId}`);
+          console.log(`🔍 StudentWorkletId: ${studentWorkletId}`);
+          
+          if (queryWorkletId !== studentWorkletId) {
+            console.log(`🔒 PRIVACY PROTECTION: Student asking about different worklet: ${queryWorkletId} (their worklet: ${studentWorkletId})`);
+            
+            // Return privacy-aware response
+            const privacyResponse = `I understand you're asking about worklet ${queryWorkletId}, but I can only provide information about your assigned worklet (${userContext.user.workletId}). 
+
+For privacy and security reasons, I cannot share details about other students' worklets or projects. Each worklet contains confidential information including project details, mentor assignments, and student data.
+
+If you'd like to know more about your own worklet ${userContext.user.workletId}, I'd be happy to help! You can ask me:
+- "Tell me about my worklet details"
+- "Who are my mentors?"
+- "What's my project status?"
+
+What would you like to know about your worklet?`;
+
+            return privacyResponse;
+          }
+        }
+      }
+      
+      // Add student context if applicable
+      let studentContext = '';
+      if (userContext?.user?.role === 'student' && userContext?.workletInfo) {
+        studentContext = `\n\nStudent Context:
+You are responding to a student (${userContext.user.name}) who is working on worklet ${userContext.user.workletId}.
+Their worklet details: ${userContext.workletInfo.title}
+${userContext.workletInfo.description ? 'Description: ' + userContext.workletInfo.description : ''}
+${userContext.workletInfo.mentor ? 'Mentor: ' + userContext.workletInfo.mentor : ''}
+When answering questions about "my worklet", "my project", or similar personal references, refer to their specific worklet ${userContext.user.workletId}.
+Always provide specific details about THEIR worklet, not general information about worklets.`;
+      }
+      
+      // Determine the type of response needed
+      console.log(`🎯 PROMPT SELECTION DEBUG:`);
+      console.log(`   isGeneralProgramQuery: ${isGeneralProgramQuery}`);
+      console.log(`   isPersonalWorkletQuery: ${isPersonalWorkletQuery}`);
+      console.log(`   isWorkletQuery: ${isWorkletQuery}`);
+      console.log(`   user.role: ${userContext?.user?.role}`);
+      console.log(`   projectResults.length: ${projectResults ? projectResults.length : 0}`);
+      console.log(`   relevantDocs.length: ${relevantDocs.length}`);
+      
+      if (isGeneralProgramQuery) {
+        // General program information - answer from documents regardless of user role
+        // This has the highest priority - even if project results exist, ignore them for general queries
+        console.log('📝 Selected prompt type: GENERAL PROGRAM QUERY (highest priority)');
+        prompt = `You are the Samsung PRISM AI Assistant. Answer the user's question using the provided context about the Samsung PRISM program.
+
+Context:
+${context}
+
+Question: ${query}
+
+Instructions:
+- Provide a clear, helpful response based on the uploaded documents about Samsung PRISM
+- Focus on general program information like eligibility, criteria, application process, overview
+- Use professional language appropriate for a corporate AI assistant
+- Structure your answer clearly with proper formatting when helpful
+- Reference the source document when providing information
+- If the context doesn't fully answer the question, say "Based on the available documents, [answer what you can]"
+- Be conversational while staying professional
+- This is NOT a worklet-specific query, so provide general program information
+
+Answer:`;
+      } else if (isPersonalWorkletQuery && userContext?.user?.role === 'student') {
+        // Personal worklet query for students
+        console.log('📝 Selected prompt type: PERSONAL WORKLET QUERY');
+        prompt = `You are the Samsung PRISM AI Assistant. Answer the student's question about THEIR specific worklet using the provided context.${studentContext}
+
+Context:
+${context}
+
+Question: ${query}
+
+Instructions:
+- This is a PERSONAL query about the student's own worklet ${userContext.user.workletId}
+- Respond directly to the student using "Your worklet" and "You are working on"
+- Start with: "Your worklet ${userContext.user.workletId} is..."
+- Provide specific details about THEIR worklet: "${userContext.workletInfo?.title}"
+- Include their domain, mentors, and current status
+- Be conversational and personal, as if speaking directly to the student
+- Use the student context to provide relevant, personalized information
+- Do NOT provide general information about the PRISM program
+- Focus specifically on their assigned project
+
+Answer:`;
+      } else if ((isWorkletQuery || isPersonalWorkletQuery) && (projectResults && projectResults.length > 0 || userContext?.user?.role === 'student')) {
+        // Specific worklet ID query
+        console.log('📝 Selected prompt type: SPECIFIC WORKLET ID QUERY');
+        prompt = `You are the Samsung PRISM AI Assistant. Provide detailed information about the requested worklet using ONLY the provided context.${studentContext}
 
 Context:
 ${context}
@@ -171,14 +295,10 @@ Question: ${query}
 
 Instructions:
 - Format the response as a professional, well-structured answer
-- Start with a brief introduction: "Here's the information about [worklet title]:"
-- Present the details in a clear, organized manner using sections:
-  📋 **Worklet Details**
-  🏛️ **Institution & Team**
-  📊 **Current Status**
+- Start with a brief introduction about the worklet
+- Present the details in a clear, organized manner
 - Use bullet points or structured formatting for clarity
 - Include all available information: title, domain, mentors, students, professors, status, stage
-- Use emojis sparingly to enhance readability
 - End with a helpful closing statement
 - Only use information from the provided context
 - Make it sound natural and conversational, like a knowledgeable assistant
@@ -186,6 +306,7 @@ Instructions:
 Answer:`;
       } else if (relevantDocs.length > 0 && (!projectResults || projectResults.length === 0)) {
         // Document-only response (no project data)
+        console.log('📝 Selected prompt type: DOCUMENT-ONLY RESPONSE');
         prompt = `You are the Samsung PRISM AI Assistant. Answer the user's question using ONLY the provided document context.
 
 Context:
@@ -205,6 +326,7 @@ Instructions:
 Answer:`;
       } else {
         // Mixed content or project-only response
+        console.log('📝 Selected prompt type: MIXED/PROJECT-ONLY RESPONSE');
         prompt = `You are the Samsung PRISM AI Assistant. Answer the user's question professionally using ONLY the provided context.
 
 Context:
@@ -226,6 +348,7 @@ Instructions:
 Answer:`;
       }
     } else {
+      console.log('📝 Selected prompt type: NO CONTENT - GENERAL RESPONSE');
       prompt = `You are the Samsung PRISM AI Assistant.
 
 Question: ${query}
@@ -299,11 +422,100 @@ export const generateRAGResponse = async (
 
     console.log('👤 User role:', user.role);
     console.log('📧 User email:', user.email);
+    console.log('👤 User name:', user.name);
+    console.log('🔖 User worklet ID:', user.workletId || 'NOT SET');
+    if (user.workletId) {
+      console.log('🔖 User worklet ID:', user.workletId);
+    } else {
+      console.log('⚠️ No worklet ID found for user');
+    }
 
-    // Search documents first
+    // Query classification variables - defined early for use throughout the function
+    const workletIdMatch = query.match(/\b0*(\d{1,3})\b/);
+    const isWorkletQuery = query.toLowerCase().includes('worklet') && !!workletIdMatch;
+    const isPersonalWorkletQuery = query.toLowerCase().includes('my worklet') || 
+                                  query.toLowerCase().includes('my project') ||
+                                  query.toLowerCase().includes('tell me about my worklet') ||
+                                  query.toLowerCase().includes('my worklet details') ||
+                                  // When a student asks "worklet details" or "worklet id" without specifying a number, assume they mean THEIR worklet
+                                  (user.role === 'student' && 
+                                   (query.toLowerCase().includes('worklet details') || 
+                                    query.toLowerCase().includes('tell me details about worklet id')) && 
+                                   !workletIdMatch);
+    
+    const isGeneralProgramQuery = query.toLowerCase().includes('eligibility') ||
+                                 query.toLowerCase().includes('criteria') ||
+                                 query.toLowerCase().includes('program overview') ||
+                                 query.toLowerCase().includes('samsung prism') ||
+                                 query.toLowerCase().includes('application') ||
+                                 query.toLowerCase().includes('requirements') ||
+                                 query.toLowerCase().includes('how to apply') ||
+                                 query.toLowerCase().includes('how to prepare') ||
+                                 query.toLowerCase().includes('preparation') ||
+                                 query.toLowerCase().includes('prism program') ||
+                                 query.toLowerCase().includes('getting ready') ||
+                                 query.toLowerCase().includes('prepare for') ||
+                                 query.toLowerCase().includes('overview') ||
+                                 (!query.toLowerCase().includes('worklet') && !isWorkletQuery);
+
+    console.log(`🔍 Query Classification - Query: "${query}"`);
+    console.log(`🔍 IsWorkletQuery: ${isWorkletQuery}`);
+    console.log(`🔍 IsPersonalWorkletQuery: ${isPersonalWorkletQuery}`);
+    console.log(`🔍 IsGeneralProgramQuery: ${isGeneralProgramQuery}`);
+    console.log(`🔍 User role: ${user.role}`);
+
+    // For students, enhance query with their worklet context
+    let enhancedQuery = query;
+    let studentWorkletInfo = null;
+    
+    if (user.role === 'student' && user.workletId) {
+      console.log(`🔄 Getting worklet details for student with worklet ID: ${user.workletId}`);
+      try {
+        studentWorkletInfo = await WorkletService.getWorkletDetails(user.workletId);
+        if (studentWorkletInfo) {
+          console.log('🎯 Adding worklet context for student:', studentWorkletInfo.title);
+          // Add worklet context to query for better search results
+          enhancedQuery = `${query} worklet:${user.workletId}`;
+        } else {
+          console.log('⚠️ No worklet details found for student');
+        }
+      } catch (workletError) {
+        console.error('⚠️ Error getting worklet details:', workletError);
+      }
+    } else {
+      console.log(`ℹ️ User is not a student or has no workletId. Role: ${user.role}, WorkletId: ${user.workletId}`);
+    }
+
+    // Search documents first (use enhanced query for students, but NOT for general program queries)
     let relevantDocs: SearchResult[] = [];
     try {
-      relevantDocs = await searchDocuments(userId, query, limit);
+      // For students, also search worklet-specific content - BUT NOT for general program queries
+      if (user.role === 'student' && user.workletId && !isGeneralProgramQuery) {
+        console.log('🎯 Student with worklet ID - adding worklet-specific content (not a general program query)');
+        const workletDocs = await WorkletService.searchWorkletContent(user.workletId, query, Math.ceil(limit / 2));
+        relevantDocs = await searchDocuments(userId, enhancedQuery, Math.ceil(limit / 2));
+        
+        // Combine worklet-specific and general search results
+        const workletSearchResults = workletDocs.map(doc => ({
+          document: {
+            _id: doc.id,
+            content: doc.content,
+            metadata: {
+              source: doc.source,
+              fileName: doc.title,
+              tags: ['worklet-specific']
+            }
+          } as any,
+          relevanceScore: doc.relevance || 0.8 // Higher relevance for worklet-specific content
+        }));
+        
+        relevantDocs = [...workletSearchResults, ...relevantDocs].slice(0, limit);
+      } else if (user.role === 'student' && user.workletId && isGeneralProgramQuery) {
+        console.log('🚫 Student with general program query - skipping worklet-specific content, using only general documents');
+        relevantDocs = await searchDocuments(userId, query, limit); // Use original query, not enhanced
+      } else {
+        relevantDocs = await searchDocuments(userId, query, limit);
+      }
       console.log(`📚 Found ${relevantDocs.length} relevant documents`);
     } catch (docError) {
       console.error('❌ Error searching documents:', docError);
@@ -313,16 +525,25 @@ export const generateRAGResponse = async (
 
     // Search projects only if no relevant documents found OR if it's a specific worklet ID query
     let projectResults: ProjectSearchResult[] = [];
-    const workletIdMatch = query.match(/\b0*(\d{1,3})\b/);
     const isSpecificWorkletQuery = query.toLowerCase().includes('worklet') && workletIdMatch;
     
     // Only search projects if:
-    // 1. No documents found AND query is project-related, OR
+    // 1. No documents found AND query is project-related AND it's NOT a general program query, OR
     // 2. It's a specific worklet ID query (like "worklet 112")
-    const shouldSearchProjects = (relevantDocs.length === 0 && isProjectRelatedQuery(query)) || isSpecificWorkletQuery;
+    // 3. AND it's not a general program query (highest priority to exclude)
+    const shouldSearchProjects = !isGeneralProgramQuery && 
+                                ((relevantDocs.length === 0 && isProjectRelatedQuery(query)) || isSpecificWorkletQuery);
+    
+    console.log(`📊 Project Search Decision:`);
+    console.log(`   shouldSearchProjects: ${shouldSearchProjects}`);
+    console.log(`   isGeneralProgramQuery: ${isGeneralProgramQuery} (blocks if true)`);
+    console.log(`   relevantDocs.length: ${relevantDocs.length}`);
+    console.log(`   isProjectRelatedQuery: ${isProjectRelatedQuery(query)}`);
+    console.log(`   isSpecificWorkletQuery: ${isSpecificWorkletQuery}`);
     
     if (shouldSearchProjects) {
       console.log('📊 Searching project database...');
+      console.log(`📊 Reason: shouldSearchProjects=${shouldSearchProjects}, relevantDocs=${relevantDocs.length}, isProjectRelated=${isProjectRelatedQuery(query)}, isGeneralProgram=${isGeneralProgramQuery}, isSpecificWorklet=${isSpecificWorkletQuery}`);
       try {
         // Create search options with user role and email for filtering
         const projectSearchOptions = {
@@ -364,7 +585,26 @@ export const generateRAGResponse = async (
 
     // Generate response with both document and project context
     console.log(`📊 Generating response with ${relevantDocs.length} documents and ${projectResults.length} projects`);
-    const answer = await generateResponse(query, relevantDocs, projectResults);
+    const userContext = {
+      user: user,
+      workletInfo: studentWorkletInfo
+    };
+    console.log('🔍 User context being passed to generateResponse:', {
+      userId: user._id,
+      role: user.role,
+      name: user.name,
+      workletId: user.workletId,
+      hasWorkletInfo: !!studentWorkletInfo,
+      workletTitle: studentWorkletInfo?.title
+    });
+    
+    const queryClassification = {
+      isWorkletQuery,
+      isPersonalWorkletQuery,
+      isGeneralProgramQuery
+    };
+    
+    const answer = await generateResponse(query, relevantDocs, projectResults, userContext, queryClassification);
 
     // Combine sources from both documents and projects
     const documentSources = relevantDocs.map(result => {

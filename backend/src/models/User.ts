@@ -5,7 +5,8 @@ export interface IUser extends Document {
   email: string;
   password: string;
   name: string;
-  role: 'user' | 'admin';
+  role: 'user' | 'admin' | 'student';
+  workletId?: string;
   isActive: boolean;
   lastLogin?: Date;
   createdAt: Date;
@@ -35,8 +36,15 @@ const userSchema = new Schema<IUser>({
   },
   role: {
     type: String,
-    enum: ['user', 'admin'],
+    enum: ['user', 'admin', 'student'],
     default: 'user'
+  },
+  workletId: {
+    type: String,
+    required: function() {
+      return this.role === 'student';
+    },
+    trim: true
   },
   isActive: {
     type: Boolean,
