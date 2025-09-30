@@ -218,14 +218,14 @@
 
 /* Dark Mode Styles */
 [data-theme="dark"] .assistant .message-bubble {
-  background-color: linear-gradient(135deg, #0A0A0A 0%, #111111 100%);
+  background: #0A0A0A;
   border: 1px solid #222222;
   color: #FFFFFF;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
 }
 
 [data-theme="dark"] .system .message-bubble {
-  background-color: linear-gradient(135deg, #111111 0%, #1A1A1A 100%);
+  background: #111111;
   color: #AAAAAA;
 }
 

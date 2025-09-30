@@ -244,7 +244,8 @@
 }
 
 [data-theme="dark"] .chat-input-container {
-  background-color: linear-gradient(135deg, #0A0A0A 0%, #111111 100%);
+  background-color: #0A0A0A;
+  background: #0A0A0A;
 }
 
 [data-theme="dark"] .input-container {

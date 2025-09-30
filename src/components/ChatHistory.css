@@ -93,11 +93,13 @@
 
 /* Dark Mode Styles */
 [data-theme="dark"] .chat-history {
-  background-color: linear-gradient(135deg, #000000 0%, #0A0A0A 100%);
+  background-color: #000000;
+  background: #000000;
 }
 
 [data-theme="dark"] .empty-chat-content {
-  background: linear-gradient(135deg, #0A0A0A 0%, #111111 100%);
+  background: #0A0A0A;
+  background-color: #0A0A0A;
   border: 1px solid #222222;
 }
 
@@ -110,6 +112,7 @@
 }
 
 [data-theme="dark"] .typing-indicator {
-  background-color: linear-gradient(135deg, #111111 0%, #1A1A1A 100%);
+  background-color: #111111;
+  background: #111111;
   border: 1px solid #222222;
 }

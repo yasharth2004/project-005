@@ -374,7 +374,7 @@
 }
 
 [data-theme="dark"] .form-input {
-  background-color: linear-gradient(135deg, #111111 0%, #1A1A1A 100%);
+  background: #111111;
   border-color: #222222;
   color: #FFFFFF;
 }

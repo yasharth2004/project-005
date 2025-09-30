@@ -116,23 +116,23 @@
 
 /* Dark Mode Styles */
 [data-theme="dark"] .document-viewer {
-  background-color: linear-gradient(135deg, #0A0A0A 0%, #111111 100%);
+  background: #0A0A0A;
   border-left: 1px solid #222222;
 }
 
 [data-theme="dark"] .document-viewer-title {
-  background-color: linear-gradient(135deg, #111111 0%, #1A1A1A 100%);
+  background: #111111;
   border-bottom: 1px solid #222222;
   color: #CCCCCC;
 }
 
 [data-theme="dark"] .document-card {
-  background-color: linear-gradient(135deg, #111111 0%, #1A1A1A 100%);
+  background: #111111;
   border: 1px solid #222222;
 }
 
 [data-theme="dark"] .document-card:hover {
-  background-color: linear-gradient(135deg, #1A1A1A 0%, #222222 100%);
+  background: #1A1A1A;
   border-color: #1A73E8;
   box-shadow: 0 4px 12px rgba(26, 115, 232, 0.2);
 }
@@ -146,7 +146,7 @@
 }
 
 [data-theme="dark"] .document-tag {
-  background-color: linear-gradient(135deg, #1A1A1A 0%, #222222 100%);
+  background: #1A1A1A;
   color: #CCCCCC;
 }
 
