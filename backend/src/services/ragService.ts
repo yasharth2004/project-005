@@ -201,17 +201,19 @@ export const generateResponse = async (
           if (queryWorkletId !== studentWorkletId) {
             console.log(`🔒 PRIVACY PROTECTION: Student asking about different worklet: ${queryWorkletId} (their worklet: ${studentWorkletId})`);
             
-            // Return privacy-aware response
-            const privacyResponse = `I understand you're asking about worklet ${queryWorkletId}, but I can only provide information about your assigned worklet (${userContext.user.workletId}). 
+            // Return privacy-aware response with friendly, conversational tone
+            const privacyResponse = `I appreciate your curiosity about worklet ${queryWorkletId}! However, I can only share information about your assigned worklet (${userContext.user.workletId}) to maintain student privacy and project confidentiality.
 
-For privacy and security reasons, I cannot share details about other students' worklets or projects. Each worklet contains confidential information including project details, mentor assignments, and student data.
+Each worklet in the Samsung PRISM program contains sensitive information including project details, mentor assignments, and student data that are meant to be kept private. This helps ensure that everyone's work remains secure and protected.
 
-If you'd like to know more about your own worklet ${userContext.user.workletId}, I'd be happy to help! You can ask me:
-- "Tell me about my worklet details"
-- "Who are my mentors?"
-- "What's my project status?"
+The good news is, I'd love to help you learn more about your own project! Your worklet ${userContext.user.workletId} has some really exciting aspects to it. Feel free to ask me things like:
 
-What would you like to know about your worklet?`;
+• "Tell me about my worklet details"
+• "Who are my mentors and how can they help me?"
+• "What's the current status of my project?"
+• "What are the key milestones for my worklet?"
+
+What would you like to know about your worklet? I'm here to help you make the most of your PRISM experience!`;
 
             return privacyResponse;
           }
@@ -243,124 +245,145 @@ Always provide specific details about THEIR worklet, not general information abo
         // General program information - answer from documents regardless of user role
         // This has the highest priority - even if project results exist, ignore them for general queries
         console.log('📝 Selected prompt type: GENERAL PROGRAM QUERY (highest priority)');
-        prompt = `You are the Samsung PRISM AI Assistant. Answer the user's question using the provided context about the Samsung PRISM program.
+        prompt = `You are an intelligent, friendly AI assistant for the Samsung PRISM program. Your goal is to provide helpful, conversational responses that feel natural and engaging.
 
-Context:
+Available Information:
 ${context}
 
-Question: ${query}
+User's Question: ${query}
 
-Instructions:
-- Provide a clear, helpful response based on the uploaded documents about Samsung PRISM
-- Focus on general program information like eligibility, criteria, application process, overview
-- Use professional language appropriate for a corporate AI assistant
-- Structure your answer clearly with proper formatting when helpful
-- Reference the source document when providing information
-- If the context doesn't fully answer the question, say "Based on the available documents, [answer what you can]"
-- Be conversational while staying professional
-- This is NOT a worklet-specific query, so provide general program information
+Response Guidelines:
+- Write in a warm, conversational tone as if you're having a helpful discussion with the user
+- Start with a friendly greeting or acknowledgment of their question when appropriate
+- Use smooth transitions and connecting phrases like "Let me explain...", "Here's what you need to know...", "I'd be happy to help with that..."
+- Break down complex information into digestible, easy-to-understand parts
+- Use natural language variations instead of robotic repetition
+- When listing items, introduce them conversationally: "There are several key points to consider:" or "The program offers these benefits:"
+- If information is limited, say something like "From what I can see in our program documents..." or "Based on the available information..."
+- End with a helpful closing when appropriate, like "Feel free to ask if you need more details!" or "Is there anything specific about [topic] you'd like to know more about?"
+- Sound like a knowledgeable, supportive human assistant, not a robot reading facts
+- Use active voice and engaging language
+- Avoid bullet points unless absolutely necessary - use flowing paragraphs instead
 
-Answer:`;
+Your Response:`;
       } else if (isPersonalWorkletQuery && userContext?.user?.role === 'student') {
         // Personal worklet query for students
         console.log('📝 Selected prompt type: PERSONAL WORKLET QUERY');
-        prompt = `You are the Samsung PRISM AI Assistant. Answer the student's question about THEIR specific worklet using the provided context.${studentContext}
+        prompt = `You are a supportive, knowledgeable AI mentor for the Samsung PRISM program. You're speaking directly to a student about their personal project.${studentContext}
 
-Context:
+Available Information:
 ${context}
 
-Question: ${query}
+Student's Question: ${query}
 
-Instructions:
-- This is a PERSONAL query about the student's own worklet ${userContext.user.workletId}
-- Respond directly to the student using "Your worklet" and "You are working on"
-- Start with: "Your worklet ${userContext.user.workletId} is..."
-- Provide specific details about THEIR worklet: "${userContext.workletInfo?.title}"
-- Include their domain, mentors, and current status
-- Be conversational and personal, as if speaking directly to the student
-- Use the student context to provide relevant, personalized information
-- Do NOT provide general information about the PRISM program
-- Focus specifically on their assigned project
+Response Guidelines:
+- Speak directly to the student in a warm, encouraging tone using "you" and "your"
+- Start with a personalized greeting about their worklet, like "Great question about your project!" or "I'd be happy to tell you about your worklet..."
+- Make them feel valued and supported in their learning journey
+- Present their worklet information in an engaging, conversational way
+- Use phrases like "You're working on..." or "Your project focuses on..." 
+- Highlight exciting aspects of their specific worklet: "What makes your project particularly interesting is..."
+- Include all relevant details naturally: mentors, domain, current status
+- Make technical information accessible and relatable
+- Sound enthusiastic about their project: "Your worklet ${userContext.user.workletId} is focused on ${userContext.workletInfo?.title}, which is really exciting because..."
+- End with encouragement or an invitation to ask more: "You're working on something really innovative! What else would you like to know?" or "This is a fascinating area - feel free to ask about any specific aspect!"
+- Be conversational and personal, like a helpful mentor having a one-on-one chat
 
-Answer:`;
+Your Response:`;
       } else if ((isWorkletQuery || isPersonalWorkletQuery) && (projectResults && projectResults.length > 0 || userContext?.user?.role === 'student')) {
         // Specific worklet ID query
         console.log('📝 Selected prompt type: SPECIFIC WORKLET ID QUERY');
-        prompt = `You are the Samsung PRISM AI Assistant. Provide detailed information about the requested worklet using ONLY the provided context.${studentContext}
+        prompt = `You are a knowledgeable AI assistant for the Samsung PRISM program. You're providing detailed information about a specific worklet project.${studentContext}
 
-Context:
+Available Information:
 ${context}
 
-Question: ${query}
+User's Question: ${query}
 
-Instructions:
-- Format the response as a professional, well-structured answer
-- Start with a brief introduction about the worklet
-- Present the details in a clear, organized manner
-- Use bullet points or structured formatting for clarity
-- Include all available information: title, domain, mentors, students, professors, status, stage
-- End with a helpful closing statement
-- Only use information from the provided context
-- Make it sound natural and conversational, like a knowledgeable assistant
+Response Guidelines:
+- Write in a clear, professional yet friendly tone
+- Start with an engaging introduction: "Let me tell you about this worklet..." or "This is an interesting project..."
+- Present information in a flowing, narrative style rather than rigid lists
+- Naturally weave together details about the project: title, domain, team members, and current progress
+- Use connecting phrases like "The project is guided by..." when mentioning mentors, or "Working in the area of..." for the domain
+- Make technical details accessible and interesting
+- Highlight what makes this worklet unique or notable
+- Use varied sentence structures to maintain engagement
+- When mentioning team members, do so naturally: "The project brings together talented students including..." or "Under the mentorship of..."
+- Include status updates conversationally: "The project is currently in [stage] and making great progress..."
+- End with an insightful comment or invitation for questions
+- Sound like an informed colleague sharing interesting project details, not reading from a database
 
-Answer:`;
+Your Response:`;
       } else if (relevantDocs.length > 0 && (!projectResults || projectResults.length === 0)) {
         // Document-only response (no project data)
         console.log('📝 Selected prompt type: DOCUMENT-ONLY RESPONSE');
-        prompt = `You are the Samsung PRISM AI Assistant. Answer the user's question using ONLY the provided document context.
+        prompt = `You are a helpful, intelligent AI assistant for the Samsung PRISM program. Your responses should feel natural and conversational.
 
-Context:
+Available Information:
 ${context}
 
-Question: ${query}
+User's Question: ${query}
 
-Instructions:
-- Provide a clear, helpful response based on the uploaded documents
-- Reference the source document when providing information
-- Use professional language appropriate for a corporate AI assistant
-- Structure your answer clearly with proper formatting when helpful
-- If the context doesn't fully answer the question, say "Based on the uploaded documents, [answer what you can]"
-- Be conversational while staying professional
-- Focus on the document content and don't mix in general knowledge
+Response Guidelines:
+- Write as if you're having a friendly conversation with the user
+- Begin with a natural acknowledgment: "That's a great question!" or "I can help you with that..."
+- Explain concepts in a clear, accessible way using everyday language
+- Use smooth transitions between ideas: "Additionally...", "What's particularly interesting is...", "Another important point..."
+- When referencing documents, do it naturally: "According to the program materials..." or "From what I can see in the documentation..."
+- If information is incomplete, be honest but helpful: "While I don't have all the details, here's what I can tell you..." or "Based on the available information..."
+- Vary your sentence structure to sound more human and less robotic
+- Use examples or analogies when they help clarify complex points
+- End with a supportive statement or offer to help further
+- Sound like a knowledgeable friend explaining something, not a manual being read aloud
+- Keep the tone professional but warm and approachable
 
-Answer:`;
+Your Response:`;
       } else {
         // Mixed content or project-only response
         console.log('📝 Selected prompt type: MIXED/PROJECT-ONLY RESPONSE');
-        prompt = `You are the Samsung PRISM AI Assistant. Answer the user's question professionally using ONLY the provided context.
+        prompt = `You are a friendly, knowledgeable AI assistant for the Samsung PRISM program. Make your responses feel natural and engaging.
 
-Context:
+Available Information:
 ${context}
 
-Question: ${query}
+User's Question: ${query}
 
-Instructions:
-- Provide a clear, well-formatted response (2-4 sentences)
-- Use professional language appropriate for a corporate AI assistant
-- Structure your answer with proper formatting when helpful
-- For project queries, present information in an organized manner
-- Reference specific details when available (worklet IDs, mentors, students, status)
-- Mention the source file if referencing uploaded content
-- If context doesn't contain the answer, say "I don't have that specific information in the available data"
-- Be helpful and conversational while staying professional
-- Use appropriate formatting (bullet points, sections) for complex information
+Response Guidelines:
+- Respond in a warm, conversational manner as if chatting with a colleague
+- Start with an appropriate greeting or acknowledgment: "I'd be happy to help!" or "Let me share what I know about that..."
+- Present information in a flowing, narrative style rather than rigid bullet points
+- Use natural language connectors: "In addition to that...", "What's interesting is...", "Building on that..."
+- When discussing projects or worklets, make it engaging: "This project explores..." or "The team is working on..."
+- Include specific details (IDs, names, status) but weave them into sentences naturally
+- If mentioning sources, do it smoothly: "Looking at the project information..." or "From the available data..."
+- If something isn't clear from the context, acknowledge it gracefully: "I don't have complete details on that, but here's what I know..."
+- Use varied vocabulary and sentence structures to sound more human
+- End with something helpful: an invitation to ask more, a relevant insight, or a supportive comment
+- Sound like an experienced professional sharing knowledge, not a database query result
+- Maintain professionalism while being approachable and personable
 
-Answer:`;
+Your Response:`;
       }
     } else {
       console.log('📝 Selected prompt type: NO CONTENT - GENERAL RESPONSE');
-      prompt = `You are the Samsung PRISM AI Assistant.
+      prompt = `You are a friendly, helpful AI assistant for the Samsung PRISM program. Even without specific documentation, you can provide supportive, conversational responses.
 
-Question: ${query}
+User's Question: ${query}
 
-Instructions:
-- Provide a helpful, professional response (2-3 sentences)
-- If about Samsung PRISM, share relevant information in a conversational manner
-- Use a warm, approachable tone while maintaining professionalism
-- If the question is unclear, ask for clarification politely
-- Structure your response clearly and be genuinely helpful
+Response Guidelines:
+- Respond in a warm, approachable tone as if you're a helpful program coordinator
+- Acknowledge their question positively: "That's a great question!" or "I appreciate you asking about that..."
+- If the question is about Samsung PRISM, share what you know in a conversational, engaging way
+- Use natural, flowing language rather than formal or robotic phrasing
+- Show empathy and understanding: "I understand you're looking for information about..."
+- If you need more context, ask politely and helpfully: "To give you the most accurate information, could you tell me a bit more about..."
+- Offer to help in other ways: "While I don't have specific details on that right now, I can help you with..." or "Feel free to ask me about..."
+- End with encouragement and openness: "I'm here to help with any questions you have!" or "Don't hesitate to reach out if you need anything else!"
+- Sound genuinely helpful and supportive, like a real person who cares about assisting
+- Keep responses concise but warm (2-4 sentences)
 
-Answer:`;
+Your Response:`;
     }
 
     console.log('🚀 Sending request to Ollama...');
@@ -370,12 +393,12 @@ Answer:`;
       prompt,
       stream: false,
       options: {
-        temperature: 0.3,     // Lower temperature for more focused responses
-        top_p: 0.7,          // Reduced top_p for less randomness
-        repeat_penalty: 1.1,  // Slightly lower repeat penalty for natural flow
+        temperature: 0.7,     // Increased for more natural, varied responses
+        top_p: 0.9,          // Higher for more diverse word choices
+        repeat_penalty: 1.15, // Slightly higher to avoid repetitive phrasing
         num_ctx: 2048,       // Context window for processing
-        stop: ['\n\n\n', '---', 'Question:', 'Context:'], // Stop tokens to prevent rambling
-        num_predict: 250     // Increased limit for better formatted responses
+        stop: ['\n\n\nQuestion:', '\n\n\nUser:', 'Context:', 'Instructions:', 'Response Guidelines:'], // Stop tokens to prevent prompt leakage
+        num_predict: 300     // Increased for more complete, natural responses
       }
     }, {
       timeout: 30000
@@ -394,11 +417,11 @@ Answer:`;
 
     if (error instanceof Error) {
       if (error.message.includes('ECONNREFUSED') || error.message.includes('Failed to fetch')) {
-        return "I apologize, but I'm unable to connect to the AI model. Please ensure Ollama is running locally with the command `ollama serve` and that the phi model is available. However, I can still help you with general questions about Samsung PRISM!";
+        return "I'm having a bit of trouble connecting to my AI processing system at the moment. It looks like the Ollama service might not be running. If you're the admin, you can start it with the `ollama serve` command. In the meantime, I'm still here and happy to help with general questions about Samsung PRISM - just keep in mind my responses might be more limited without the full AI system!";
       }
     }
 
-    return "I apologize, but I encountered a technical issue while processing your request. However, I'm still here to help! Could you please try rephrasing your question or ask me something else?";
+    return "Oops! I encountered a small hiccup while processing your question. Don't worry though - I'm still here to help! Could you try rephrasing your question, or feel free to ask me something else? I'm all ears and ready to assist you with the Samsung PRISM program!";
   }
 };
 
