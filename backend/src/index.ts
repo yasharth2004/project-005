@@ -26,22 +26,12 @@ app.use(helmet());
 
 // CORS configuration - Allow all Vercel deployments
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, Postman, etc.)
-    if (!origin) return callback(null, true);
-    
-    // Allow localhost and all Vercel domains
-    if (
-      origin.includes('localhost') ||
-      origin.includes('vercel.app') ||
-      origin.includes('ngrok')
-    ) {
-      return callback(null, true);
-    }
-    
-    callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true
+  origin: true, // Allow all origins temporarily to debug
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 600 // Cache preflight for 10 minutes
 }));
 
 // Body parsing middleware
