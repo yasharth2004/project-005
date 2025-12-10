@@ -475,14 +475,14 @@ Your Response:`;
       repeat_penalty: 1.5, // Heavy penalty for repetition
       num_ctx: 512,        // Very small context window
       stop: ['\n\n', '\nQuestion:', '\nUser:', 'Context:', 'Instructions:', 'Response Guidelines:', 'CRITICAL INSTRUCTIONS:', '\nConsider', '\nImagine', 'scenario', 'hypothetical', 'rules:', 'programmed', '1.', '2.', 'The assistant', '\nUser:', 'User:', 'Assistant:'],
-      num_predict: 60      // Very short - max 60 tokens
+      num_predict: 50      // Very short - max 50 tokens
     } : {
       temperature: 0.6,     // Slightly lower for more focused responses
       top_p: 0.85,         // Slightly restricted
       repeat_penalty: 1.2,
-      num_ctx: 2048,
+      num_ctx: 1536,       // Reduced from 2048 for 8GB RAM
       stop: ['\n\n\nQuestion:', '\n\nUser:', '\nUser:', 'User:', 'Assistant:', 'Context:', 'Instructions:', 'Response Guidelines:', '\nConsider', '\nImagine', 'scenario based on', 'following scenario', 'project management system'],
-      num_predict: 250     // Shorter to prevent rambling
+      num_predict: 150     // Reduced from 250 for 8GB RAM
     };
 
     const response = await axios.post('http://localhost:11434/api/generate', {
@@ -491,7 +491,7 @@ Your Response:`;
       stream: false,
       options: modelOptions
     }, {
-      timeout: 30000
+      timeout: 60000
     });
 
     if (!response.data || !response.data.response) {
