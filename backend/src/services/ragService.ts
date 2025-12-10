@@ -26,6 +26,71 @@ export interface RAGResponse {
   query: string;
 }
 
+// Conversation memory storage (in-memory cache)
+interface ConversationTurn {
+  query: string;
+  answer: string;
+  timestamp: Date;
+}
+
+const conversationMemory: Map<string, ConversationTurn[]> = new Map();
+const MAX_MEMORY_TURNS = 5; // Keep last 5 exchanges
+const MEMORY_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
+
+// Add conversation to memory
+const addToMemory = (userId: string, query: string, answer: string) => {
+  if (!conversationMemory.has(userId)) {
+    conversationMemory.set(userId, []);
+  }
+  
+  const userMemory = conversationMemory.get(userId)!;
+  userMemory.push({ query, answer, timestamp: new Date() });
+  
+  // Keep only recent turns
+  if (userMemory.length > MAX_MEMORY_TURNS) {
+    userMemory.shift();
+  }
+  
+  conversationMemory.set(userId, userMemory);
+};
+
+// Get conversation history for context
+const getConversationContext = (userId: string): string => {
+  const userMemory = conversationMemory.get(userId);
+  if (!userMemory || userMemory.length === 0) return '';
+  
+  // Filter out expired conversations
+  const now = new Date();
+  const recentMemory = userMemory.filter(turn => 
+    (now.getTime() - turn.timestamp.getTime()) < MEMORY_EXPIRY_MS
+  );
+  
+  if (recentMemory.length === 0) {
+    conversationMemory.delete(userId);
+    return '';
+  }
+  
+  // Format conversation history
+  return recentMemory
+    .map(turn => `User: ${turn.query}\nAssistant: ${turn.answer}`)
+    .join('\n\n');
+};
+
+// Clean up expired memories periodically
+setInterval(() => {
+  const now = new Date();
+  for (const [userId, memory] of conversationMemory.entries()) {
+    const recentMemory = memory.filter(turn => 
+      (now.getTime() - turn.timestamp.getTime()) < MEMORY_EXPIRY_MS
+    );
+    if (recentMemory.length === 0) {
+      conversationMemory.delete(userId);
+    } else {
+      conversationMemory.set(userId, recentMemory);
+    }
+  }
+}, 5 * 60 * 1000); // Clean up every 5 minutes
+
 // Simple similarity function
 const calculateSimilarity = (query: string, content: string): number => {
   const queryWords = query.toLowerCase().split(/\s+/).filter(word => word.length > 2);
@@ -122,13 +187,21 @@ export const generateResponse = async (
     isWorkletQuery: boolean;
     isPersonalWorkletQuery: boolean;
     isGeneralProgramQuery: boolean;
-  }
+  },
+  conversationHistory?: string
 ): Promise<string> => {
   try {
     console.log('🤖 Generating response with Ollama API');
 
     let context = '';
     let prompt = '';
+
+    // Add conversation history for context continuity
+    let conversationContext = '';
+    if (conversationHistory && conversationHistory.trim().length > 0) {
+      conversationContext = `\nRecent Conversation:\n${conversationHistory}\n`;
+      console.log('💬 Including conversation history for context');
+    }
 
     // Build context from both documents and project data
     let hasContent = false;
@@ -245,31 +318,31 @@ Always provide specific details about THEIR worklet, not general information abo
         // General program information - answer from documents regardless of user role
         // This has the highest priority - even if project results exist, ignore them for general queries
         console.log('📝 Selected prompt type: GENERAL PROGRAM QUERY (highest priority)');
-        prompt = `You are an intelligent, friendly AI assistant for the Samsung PRISM program. Your goal is to provide helpful, conversational responses that feel natural and engaging.
-
+        prompt = `You are an AI assistant for the Samsung PRISM program. Provide clear, accurate information based on the context.
+${conversationContext}
 Available Information:
 ${context}
 
 User's Question: ${query}
 
 Response Guidelines:
-- Write in a warm, conversational tone as if you're having a helpful discussion with the user
-- Start with a friendly greeting or acknowledgment of their question when appropriate
-- Use smooth transitions and connecting phrases like "Let me explain...", "Here's what you need to know...", "I'd be happy to help with that..."
-- Break down complex information into digestible, easy-to-understand parts
-- Use natural language variations instead of robotic repetition
-- When listing items, introduce them conversationally: "There are several key points to consider:" or "The program offers these benefits:"
-- If information is limited, say something like "From what I can see in our program documents..." or "Based on the available information..."
-- End with a helpful closing when appropriate, like "Feel free to ask if you need more details!" or "Is there anything specific about [topic] you'd like to know more about?"
-- Sound like a knowledgeable, supportive human assistant, not a robot reading facts
-- Use active voice and engaging language
-- Avoid bullet points unless absolutely necessary - use flowing paragraphs instead
+- Consider the conversation history when answering (if provided above)
+- Give a direct, precise answer to the question
+- Use short, clean sentences that are easy to understand
+- Include ONLY information present in the context above
+- If the user refers to something from earlier ("it", "that", "this"), check the conversation history
+- Organize information logically when covering multiple points
+- If the context has limited information, state clearly: "The available information shows..."
+- Do NOT invent details, scenarios, or examples not in the context
+- Do NOT create hypothetical situations or fictional characters
+- Maintain a professional, helpful tone
+- Avoid marketing language or excessive enthusiasm
 
 Your Response:`;
       } else if (isPersonalWorkletQuery && userContext?.user?.role === 'student') {
         // Personal worklet query for students
         console.log('📝 Selected prompt type: PERSONAL WORKLET QUERY');
-        prompt = `You are a supportive, knowledgeable AI mentor for the Samsung PRISM program. You're speaking directly to a student about their personal project.${studentContext}
+        prompt = `You are an AI assistant helping a student with their Samsung PRISM project.${studentContext}
 
 Available Information:
 ${context}
@@ -277,23 +350,25 @@ ${context}
 Student's Question: ${query}
 
 Response Guidelines:
-- Speak directly to the student in a warm, encouraging tone using "you" and "your"
-- Start with a personalized greeting about their worklet, like "Great question about your project!" or "I'd be happy to tell you about your worklet..."
-- Make them feel valued and supported in their learning journey
-- Present their worklet information in an engaging, conversational way
-- Use phrases like "You're working on..." or "Your project focuses on..." 
-- Highlight exciting aspects of their specific worklet: "What makes your project particularly interesting is..."
-- Include all relevant details naturally: mentors, domain, current status
-- Make technical information accessible and relatable
-- Sound enthusiastic about their project: "Your worklet ${userContext.user.workletId} is focused on ${userContext.workletInfo?.title}, which is really exciting because..."
-- End with encouragement or an invitation to ask more: "You're working on something really innovative! What else would you like to know?" or "This is a fascinating area - feel free to ask about any specific aspect!"
-- Be conversational and personal, like a helpful mentor having a one-on-one chat
+- Address the student directly using "you" and "your"
+- Provide clear, specific information about their worklet ${userContext.user.workletId}
+- Include relevant details: project title, domain, mentors, and current status
+- Keep sentences concise and well-organized
+- Focus on facts from the context only
+- Do NOT invent details, scenarios, or hypothetical examples
+- Do NOT create fictional situations or characters
+- Do NOT create fake conversations (User: ... Assistant: ...)
+- Do NOT invent numbered lists of people, systems, or rules
+- Do NOT make up mentor IDs, project management systems, or expertise areas
+- Use a supportive but professional tone
+- Avoid over-enthusiasm or filler phrases
+- Answer ONLY what was asked - do not expand with invented scenarios
 
 Your Response:`;
       } else if ((isWorkletQuery || isPersonalWorkletQuery) && (projectResults && projectResults.length > 0 || userContext?.user?.role === 'student')) {
         // Specific worklet ID query
         console.log('📝 Selected prompt type: SPECIFIC WORKLET ID QUERY');
-        prompt = `You are a knowledgeable AI assistant for the Samsung PRISM program. You're providing detailed information about a specific worklet project.${studentContext}
+        prompt = `You are an AI assistant providing information about a specific Samsung PRISM worklet.${studentContext}
 
 Available Information:
 ${context}
@@ -301,24 +376,26 @@ ${context}
 User's Question: ${query}
 
 Response Guidelines:
-- Write in a clear, professional yet friendly tone
-- Start with an engaging introduction: "Let me tell you about this worklet..." or "This is an interesting project..."
-- Present information in a flowing, narrative style rather than rigid lists
-- Naturally weave together details about the project: title, domain, team members, and current progress
-- Use connecting phrases like "The project is guided by..." when mentioning mentors, or "Working in the area of..." for the domain
-- Make technical details accessible and interesting
-- Highlight what makes this worklet unique or notable
-- Use varied sentence structures to maintain engagement
-- When mentioning team members, do so naturally: "The project brings together talented students including..." or "Under the mentorship of..."
-- Include status updates conversationally: "The project is currently in [stage] and making great progress..."
-- End with an insightful comment or invitation for questions
-- Sound like an informed colleague sharing interesting project details, not reading from a database
+- Provide clear, organized information about the worklet
+- Include key details: title, domain, team members, mentors, and current status
+- Present information in a logical flow using facts from the context
+- Use concise sentences that are easy to scan
+- Keep the tone professional and informative
+- Do NOT invent details not present in the context
+- Do NOT create scenarios, hypothetical examples, or fictional content
+- Do NOT write fake conversations (User: ... Assistant: ...)
+- Do NOT create numbered lists of fake people, systems, or rules
+- Do NOT invent mentor IDs, management systems, or expertise areas
+- Avoid marketing language or excessive enthusiasm
+- Include only facts present in the context
+- Structure the response for readability
+- Answer ONLY what was asked
 
 Your Response:`;
       } else if (relevantDocs.length > 0 && (!projectResults || projectResults.length === 0)) {
         // Document-only response (no project data)
         console.log('📝 Selected prompt type: DOCUMENT-ONLY RESPONSE');
-        prompt = `You are a helpful, intelligent AI assistant for the Samsung PRISM program. Your responses should feel natural and conversational.
+        prompt = `You are an AI assistant with access to Samsung PRISM program documents.
 
 Available Information:
 ${context}
@@ -326,23 +403,21 @@ ${context}
 User's Question: ${query}
 
 Response Guidelines:
-- Write as if you're having a friendly conversation with the user
-- Begin with a natural acknowledgment: "That's a great question!" or "I can help you with that..."
-- Explain concepts in a clear, accessible way using everyday language
-- Use smooth transitions between ideas: "Additionally...", "What's particularly interesting is...", "Another important point..."
-- When referencing documents, do it naturally: "According to the program materials..." or "From what I can see in the documentation..."
-- If information is incomplete, be honest but helpful: "While I don't have all the details, here's what I can tell you..." or "Based on the available information..."
-- Vary your sentence structure to sound more human and less robotic
-- Use examples or analogies when they help clarify complex points
-- End with a supportive statement or offer to help further
-- Sound like a knowledgeable friend explaining something, not a manual being read aloud
-- Keep the tone professional but warm and approachable
+- Answer based solely on the provided document content
+- Cite specific information when relevant
+- Use clear, direct language based on facts only
+- Keep sentences concise and factual
+- If documents don't contain the answer, state clearly: "This information is not in the available documents"
+- Do NOT speculate or invent information beyond what's documented
+- Do NOT create examples, scenarios, or hypothetical situations
+- Present information in logical order
+- Maintain a helpful, professional tone
 
 Your Response:`;
       } else {
         // Mixed content or project-only response
         console.log('📝 Selected prompt type: MIXED/PROJECT-ONLY RESPONSE');
-        prompt = `You are a friendly, knowledgeable AI assistant for the Samsung PRISM program. Make your responses feel natural and engaging.
+        prompt = `You are an AI assistant for the Samsung PRISM program with access to project and document information.
 
 Available Information:
 ${context}
@@ -350,56 +425,71 @@ ${context}
 User's Question: ${query}
 
 Response Guidelines:
-- Respond in a warm, conversational manner as if chatting with a colleague
-- Start with an appropriate greeting or acknowledgment: "I'd be happy to help!" or "Let me share what I know about that..."
-- Present information in a flowing, narrative style rather than rigid bullet points
-- Use natural language connectors: "In addition to that...", "What's interesting is...", "Building on that..."
-- When discussing projects or worklets, make it engaging: "This project explores..." or "The team is working on..."
-- Include specific details (IDs, names, status) but weave them into sentences naturally
-- If mentioning sources, do it smoothly: "Looking at the project information..." or "From the available data..."
-- If something isn't clear from the context, acknowledge it gracefully: "I don't have complete details on that, but here's what I know..."
-- Use varied vocabulary and sentence structures to sound more human
-- End with something helpful: an invitation to ask more, a relevant insight, or a supportive comment
-- Sound like an experienced professional sharing knowledge, not a database query result
-- Maintain professionalism while being approachable and personable
+- Synthesize information from all available sources above
+- Present key facts clearly and concisely
+- Organize information logically using only provided data
+- Use direct, professional language
+- Include specific details (IDs, names, status) from the context
+- Keep sentences short and informative
+- Do NOT invent information, scenarios, or examples
+- Do NOT create hypothetical situations or fictional characters
+- If information is incomplete, state clearly what is available
+- Maintain a helpful tone without excessive friendliness
 
 Your Response:`;
       }
     } else {
       console.log('📝 Selected prompt type: NO CONTENT - GENERAL RESPONSE');
-      prompt = `You are a friendly, helpful AI assistant for the Samsung PRISM program. Even without specific documentation, you can provide supportive, conversational responses.
+      prompt = `You are an AI assistant for Samsung PRISM.
 
-User's Question: ${query}
+User asked: ${query}
 
-Response Guidelines:
-- Respond in a warm, approachable tone as if you're a helpful program coordinator
-- Acknowledge their question positively: "That's a great question!" or "I appreciate you asking about that..."
-- If the question is about Samsung PRISM, share what you know in a conversational, engaging way
-- Use natural, flowing language rather than formal or robotic phrasing
-- Show empathy and understanding: "I understand you're looking for information about..."
-- If you need more context, ask politely and helpfully: "To give you the most accurate information, could you tell me a bit more about..."
-- Offer to help in other ways: "While I don't have specific details on that right now, I can help you with..." or "Feel free to ask me about..."
-- End with encouragement and openness: "I'm here to help with any questions you have!" or "Don't hesitate to reach out if you need anything else!"
-- Sound genuinely helpful and supportive, like a real person who cares about assisting
-- Keep responses concise but warm (2-4 sentences)
+YOU MUST respond with EXACTLY this and NOTHING else:
+"I don't have specific information about [their topic]. I can help with Samsung PRISM program details, worklet information, or project guidance. What would you like to know?"
+
+Replace [their topic] with what they asked about (1-3 words maximum).
+
+DO NOT:
+- Write more than 2 sentences
+- Invent rules, constraints, or limitations
+- Create scenarios, examples, or lists
+- Discuss how you were programmed
+- Make numbered points
+- Use phrases like "The assistant can/has/is"
+
+Write ONLY the response template above with [their topic] replaced.
 
 Your Response:`;
     }
 
     console.log('🚀 Sending request to Ollama...');
+    console.log('📋 Context preview:', context.substring(0, 500));
+    console.log('💬 Prompt preview:', prompt.substring(0, 300));
+
+    // Use stricter parameters when no content is available to prevent hallucinations
+    const hasNoContent = !hasContent;
+    const modelOptions = hasNoContent ? {
+      temperature: 0.05,    // EXTREMELY low - almost deterministic
+      top_p: 0.3,          // Very restricted vocabulary
+      top_k: 10,           // Only consider top 10 tokens
+      repeat_penalty: 1.5, // Heavy penalty for repetition
+      num_ctx: 512,        // Very small context window
+      stop: ['\n\n', '\nQuestion:', '\nUser:', 'Context:', 'Instructions:', 'Response Guidelines:', 'CRITICAL INSTRUCTIONS:', '\nConsider', '\nImagine', 'scenario', 'hypothetical', 'rules:', 'programmed', '1.', '2.', 'The assistant', '\nUser:', 'User:', 'Assistant:'],
+      num_predict: 60      // Very short - max 60 tokens
+    } : {
+      temperature: 0.6,     // Slightly lower for more focused responses
+      top_p: 0.85,         // Slightly restricted
+      repeat_penalty: 1.2,
+      num_ctx: 2048,
+      stop: ['\n\n\nQuestion:', '\n\nUser:', '\nUser:', 'User:', 'Assistant:', 'Context:', 'Instructions:', 'Response Guidelines:', '\nConsider', '\nImagine', 'scenario based on', 'following scenario', 'project management system'],
+      num_predict: 250     // Shorter to prevent rambling
+    };
 
     const response = await axios.post('http://localhost:11434/api/generate', {
       model: 'phi',
       prompt,
       stream: false,
-      options: {
-        temperature: 0.7,     // Increased for more natural, varied responses
-        top_p: 0.9,          // Higher for more diverse word choices
-        repeat_penalty: 1.15, // Slightly higher to avoid repetitive phrasing
-        num_ctx: 2048,       // Context window for processing
-        stop: ['\n\n\nQuestion:', '\n\n\nUser:', 'Context:', 'Instructions:', 'Response Guidelines:'], // Stop tokens to prevent prompt leakage
-        num_predict: 300     // Increased for more complete, natural responses
-      }
+      options: modelOptions
     }, {
       timeout: 30000
     });
@@ -410,6 +500,66 @@ Your Response:`;
 
     const generatedResponse = response.data.response.trim();
     console.log('✅ Response received from Ollama');
+    console.log('📝 Response preview:', generatedResponse.substring(0, 200));
+
+    // Detect and block hallucination patterns when no content was provided
+    if (hasNoContent) {
+      const hallucinationPatterns = [
+        /imagine.*scenario/i,
+        /consider.*scenario/i,
+        /let'?s.*consider/i,
+        /for example.*three.*people/i,
+        /version.*A.*B.*C/i,
+        /Anna.*Ben.*Carl/i,
+        /fictional/i,
+        /hypothetical.*where/i,
+        /let me.*story/i,
+        /programmed with.*rules/i,
+        /set of rules/i,
+        /constraints for answering/i,
+        /assistant can only/i,
+        /assistant has been/i,
+        /following rules/i,
+        /these rules/i,
+        /rule number/i,
+        /\d+\.\s+The assistant/i,
+        /Here are some/i,
+        /list of.*rules/i
+      ];
+      
+      const containsHallucination = hallucinationPatterns.some(pattern => pattern.test(generatedResponse));
+      
+      if (containsHallucination || generatedResponse.length > 150) {
+        console.warn('⚠️ Hallucination detected in response - using fallback');
+        return "I don't have specific information about that. I can help you with Samsung PRISM program details, worklet information, or project guidance. What would you like to know?";
+      }
+    }
+    
+    // ALWAYS check for hallucination patterns even with content
+    const globalHallucinationPatterns = [
+      /User:.*Assistant:/i,
+      /Consider.*following scenario/i,
+      /following scenario based on/i,
+      /project management system where/i,
+      /ID number corresponds/i,
+      /system has been programmed/i,
+      /\d+\.\s+Dr\.\s+\w+\s+\w+\s+-\s+.*\(ID\s+\d+\)/i, // Fake numbered mentor lists
+      /mentor'?s ID number/i,
+      /specific area of expertise:/i,
+      /if a request is made about worklet ID/i
+    ];
+    
+    const hasGlobalHallucination = globalHallucinationPatterns.some(pattern => pattern.test(generatedResponse));
+    
+    if (hasGlobalHallucination) {
+      console.warn('⚠️ CRITICAL: Global hallucination pattern detected - blocking response');
+      // Return only the first sentence if it contains actual data
+      const sentences = generatedResponse.split(/[.!?]\s+/);
+      if (sentences.length > 0 && sentences[0].length < 200 && !globalHallucinationPatterns.some(p => p.test(sentences[0]))) {
+        return sentences[0] + '.';
+      }
+      return "I can provide information about that worklet. Please ask a specific question about what you'd like to know.";
+    }
 
     return generatedResponse;
   } catch (error) {
@@ -417,11 +567,11 @@ Your Response:`;
 
     if (error instanceof Error) {
       if (error.message.includes('ECONNREFUSED') || error.message.includes('Failed to fetch')) {
-        return "I'm having a bit of trouble connecting to my AI processing system at the moment. It looks like the Ollama service might not be running. If you're the admin, you can start it with the `ollama serve` command. In the meantime, I'm still here and happy to help with general questions about Samsung PRISM - just keep in mind my responses might be more limited without the full AI system!";
+        return "I'm having trouble connecting to the AI service right now. The Ollama service may not be running. You can still ask questions, but responses will be limited.";
       }
     }
 
-    return "Oops! I encountered a small hiccup while processing your question. Don't worry though - I'm still here to help! Could you try rephrasing your question, or feel free to ask me something else? I'm all ears and ready to assist you with the Samsung PRISM program!";
+    return "Sorry, I encountered an error processing your question. Could you try rephrasing or ask something else?";
   }
 };
 
@@ -451,6 +601,59 @@ export const generateRAGResponse = async (
       console.log('🔖 User worklet ID:', user.workletId);
     } else {
       console.log('⚠️ No worklet ID found for user');
+    }
+
+    // Detect if query is a simple greeting or farewell (short queries without specific questions)
+    const isShortQuery = query.trim().split(/\s+/).length <= 3;
+    const lowerQuery = query.toLowerCase().trim();
+    const greetingKeywords = ['hi', 'hello', 'hey', 'namaste', 'hola', 'bonjour', 'morning', 'evening', 'afternoon'];
+    const farewellKeywords = ['bye', 'goodbye', 'night', 'thanks', 'thank'];
+    
+    const seemsLikeGreeting = isShortQuery && greetingKeywords.some(word => lowerQuery.includes(word));
+    const seemsLikeFarewell = isShortQuery && farewellKeywords.some(word => lowerQuery.includes(word));
+    
+    if (seemsLikeGreeting) {
+      console.log('👋 Detected likely greeting');
+      const userName = user.name ? user.name.split(' ')[0] : '';
+      const greeting = userName ? `Hello, ${userName}!` : 'Hello!';
+      
+      const introResponses = [
+        `${greeting} I'm your Samsung PRISM assistant. I can help you with program information, worklet details, and project guidance. What would you like to know?`,
+        `${greeting} I'm the Samsung PRISM AI assistant. Ask me about program details, your worklet, or any project questions. How can I help?`,
+        `${greeting} I'm here to assist with Samsung PRISM. I can answer questions about the program, worklets, and projects. What do you need?`
+      ];
+      
+      const greetingAnswer = introResponses[Math.floor(Math.random() * introResponses.length)];
+      
+      // Store greeting in memory
+      addToMemory(userId, query, greetingAnswer);
+      
+      return {
+        answer: greetingAnswer,
+        sources: [],
+        query
+      };
+    }
+    
+    if (seemsLikeFarewell) {
+      console.log('👋 Detected likely farewell');
+      const farewellResponses = [
+        "Goodbye! Feel free to return anytime.",
+        "Take care! Happy to help whenever you need.",
+        "See you later! Good luck with your project.",
+        "Bye! Don't hesitate to ask if you need anything."
+      ];
+      
+      const farewellAnswer = farewellResponses[Math.floor(Math.random() * farewellResponses.length)];
+      
+      // Store farewell in memory
+      addToMemory(userId, query, farewellAnswer);
+      
+      return {
+        answer: farewellAnswer,
+        sources: [],
+        query
+      };
     }
 
     // Query classification variables - defined early for use throughout the function
@@ -627,7 +830,20 @@ export const generateRAGResponse = async (
       isGeneralProgramQuery
     };
     
-    const answer = await generateResponse(query, relevantDocs, projectResults, userContext, queryClassification);
+    // Get conversation history for this user
+    const conversationHistory = getConversationContext(userId);
+    
+    const answer = await generateResponse(
+      query, 
+      relevantDocs, 
+      projectResults, 
+      userContext, 
+      queryClassification,
+      conversationHistory
+    );
+
+    // Store this interaction in memory
+    addToMemory(userId, query, answer);
 
     // Combine sources from both documents and projects
     const documentSources = relevantDocs.map(result => {

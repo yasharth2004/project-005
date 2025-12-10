@@ -153,7 +153,10 @@ export const parseProjectsFromExcel = async (filePath: string): Promise<ProjectP
             .filter(val => val.length > 0);
         };
         
-        const workletId = getCellValue(headers.workletId as number);
+        // Special handling for worklet ID to ensure it's a clean string
+        const rawWorkletId = getCellValue(headers.workletId as number);
+        // Remove any non-printable or unicode characters, keep only alphanumeric and basic punctuation
+        const workletId = rawWorkletId.replace(/[^\x20-\x7E]/g, '').trim();
         const workletTitle = getCellValue(headers.workletTitle as number);
         const domain = getCellValue(headers.domain as number);
         const college = getCellValue(headers.college as number);

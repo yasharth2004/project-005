@@ -138,6 +138,13 @@ export const formatProjectResultsForRAG = (results: ProjectSearchResult[]): stri
 
   return results.map(result => {
     const project = result.project;
+    
+    // Debug: Check for Unicode issues in workletId
+    const workletIdClean = project.workletId.replace(/[^\x20-\x7E]/g, '');
+    if (workletIdClean !== project.workletId) {
+      console.warn(`⚠️  Non-ASCII characters found in worklet ID: "${project.workletId}" (hex: ${Buffer.from(project.workletId).toString('hex')})`);
+    }
+    
     let projectInfo = `WORKLET INFORMATION:\n`;
     projectInfo += `Worklet ID: ${project.workletId}\n`;
     projectInfo += `Title: ${project.workletTitle}\n`;
