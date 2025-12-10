@@ -24,14 +24,23 @@ const PORT = process.env.PORT || 5000;
 // Security middleware
 app.use(helmet());
 
-// CORS configuration
+// CORS configuration - Allow all Vercel deployments
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    'https://project-005.vercel.app',
-    'https://project-005-git-main-jbjbs-projects-479ffbb9.vercel.app',
-    'https://project-005-ej7sz006f-jbjbs-projects-479ffbb9.vercel.app'
-  ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    // Allow localhost and all Vercel domains
+    if (
+      origin.includes('localhost') ||
+      origin.includes('vercel.app') ||
+      origin.includes('ngrok')
+    ) {
+      return callback(null, true);
+    }
+    
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
 
