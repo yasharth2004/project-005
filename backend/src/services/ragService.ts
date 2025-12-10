@@ -209,7 +209,7 @@ export const generateResponse = async (
     if (relevantDocs.length > 0) {
       // Limit context to most relevant chunks and truncate long content
       const docContext = relevantDocs
-        .slice(0, 3) // Only use top 3 most relevant documents
+        .slice(0, 5) // Use top 5 most relevant documents for better coverage
         .map(result => {
           const doc = result.document;
           const fileName = (doc as any).fileId?.originalName || doc.metadata.fileName;
@@ -477,12 +477,12 @@ Your Response:`;
       stop: ['\n\n', '\nQuestion:', '\nUser:', 'Context:', 'Instructions:', 'Response Guidelines:', 'CRITICAL INSTRUCTIONS:', '\nConsider', '\nImagine', 'scenario', 'hypothetical', 'rules:', 'programmed', '1.', '2.', 'The assistant', '\nUser:', 'User:', 'Assistant:'],
       num_predict: 50      // Very short - max 50 tokens
     } : {
-      temperature: 0.6,     // Slightly lower for more focused responses
-      top_p: 0.85,         // Slightly restricted
-      repeat_penalty: 1.2,
-      num_ctx: 1536,       // Reduced from 2048 for 8GB RAM
-      stop: ['\n\n\nQuestion:', '\n\nUser:', '\nUser:', 'User:', 'Assistant:', 'Context:', 'Instructions:', 'Response Guidelines:', '\nConsider', '\nImagine', 'scenario based on', 'following scenario', 'project management system'],
-      num_predict: 150     // Reduced from 250 for 8GB RAM
+      temperature: 0.5,     // Lower for more focused responses
+      top_p: 0.9,          
+      repeat_penalty: 1.1,
+      num_ctx: 1024,       // Reduced for 8GB RAM - smaller context
+      stop: ['\n\n\nQuestion:', '\n\nUser:', 'User:', 'Assistant:', 'Thank you for'],
+      num_predict: 200     // Increased slightly for complete answers
     };
 
     const response = await axios.post('http://localhost:11434/api/generate', {
