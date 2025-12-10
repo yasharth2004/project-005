@@ -26,7 +26,12 @@ app.use(helmet());
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: [
+    'http://localhost:5173',
+    'https://project-005.vercel.app',
+    'https://project-005-git-main-jbjbs-projects-479ffbb9.vercel.app',
+    'https://project-005-ej7sz006f-jbjbs-projects-479ffbb9.vercel.app'
+  ],
   credentials: true
 }));
 
