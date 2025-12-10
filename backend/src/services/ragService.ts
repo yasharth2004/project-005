@@ -318,27 +318,25 @@ Always provide specific details about THEIR worklet, not general information abo
         // General program information - answer from documents regardless of user role
         // This has the highest priority - even if project results exist, ignore them for general queries
         console.log('📝 Selected prompt type: GENERAL PROGRAM QUERY (highest priority)');
-        prompt = `You are an AI assistant for the Samsung PRISM program. Provide clear, accurate information based on the context.
+        prompt = `You are an AI assistant for Samsung PRISM program.
 ${conversationContext}
-Available Information:
+Context:
 ${context}
 
-User's Question: ${query}
+Question: ${query}
 
-Response Guidelines:
-- Consider the conversation history when answering (if provided above)
-- Give a direct, precise answer to the question
-- Use short, clean sentences that are easy to understand
-- Include ONLY information present in the context above
-- If the user refers to something from earlier ("it", "that", "this"), check the conversation history
-- Organize information logically when covering multiple points
-- If the context has limited information, state clearly: "The available information shows..."
-- Do NOT invent details, scenarios, or examples not in the context
-- Do NOT create hypothetical situations or fictional characters
-- Maintain a professional, helpful tone
-- Avoid marketing language or excessive enthusiasm
+Instructions:
+- Answer using ONLY facts from the context above
+- Be direct and concise (1-2 short paragraphs maximum)
+- State exactly what the documents say
+- If information is limited, say: "Based on available documents, [what you found]"
+- Do NOT create hypothetical situations (no "Consider...", "Imagine...", "Let's say...")
+- Do NOT invent examples with College A/B/C, people names, or scenarios
+- Do NOT make up requirements, rules, or constraints
+- Do NOT create numbered lists unless they exist in the context
+- Stop immediately after answering
 
-Your Response:`;
+Answer:`;
       } else if (isPersonalWorkletQuery && userContext?.user?.role === 'student') {
         // Personal worklet query for students
         console.log('📝 Selected prompt type: PERSONAL WORKLET QUERY');
