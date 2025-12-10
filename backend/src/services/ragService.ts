@@ -368,30 +368,24 @@ Your Response:`;
       } else if ((isWorkletQuery || isPersonalWorkletQuery) && (projectResults && projectResults.length > 0 || userContext?.user?.role === 'student')) {
         // Specific worklet ID query
         console.log('📝 Selected prompt type: SPECIFIC WORKLET ID QUERY');
-        prompt = `You are an AI assistant providing information about a specific Samsung PRISM worklet.${studentContext}
+        prompt = `You are an AI assistant for Samsung PRISM program providing worklet information.${studentContext}
 
-Available Information:
+Context:
 ${context}
 
-User's Question: ${query}
+Question: ${query}
 
-Response Guidelines:
-- Provide clear, organized information about the worklet
-- Include key details: title, domain, team members, mentors, and current status
-- Present information in a logical flow using facts from the context
-- Use concise sentences that are easy to scan
-- Keep the tone professional and informative
-- Do NOT invent details not present in the context
-- Do NOT create scenarios, hypothetical examples, or fictional content
-- Do NOT write fake conversations (User: ... Assistant: ...)
-- Do NOT create numbered lists of fake people, systems, or rules
-- Do NOT invent mentor IDs, management systems, or expertise areas
-- Avoid marketing language or excessive enthusiasm
-- Include only facts present in the context
-- Structure the response for readability
-- Answer ONLY what was asked
+Instructions:
+- Answer directly using only facts from the context above
+- Include: worklet title, domain, institution, team members, mentors, professors, status, and review stage
+- Use 1-2 short paragraphs maximum
+- Be specific and factual
+- Do NOT add exercises, quizzes, or questions at the end
+- Do NOT create examples or scenarios
+- Do NOT invent any details
+- Stop immediately after providing the factual information
 
-Your Response:`;
+Answer:`;
       } else if (relevantDocs.length > 0 && (!projectResults || projectResults.length === 0)) {
         // Document-only response (no project data)
         console.log('📝 Selected prompt type: DOCUMENT-ONLY RESPONSE');
@@ -477,12 +471,12 @@ Your Response:`;
       stop: ['\n\n', '\nQuestion:', '\nUser:', 'Context:', 'Instructions:', 'Response Guidelines:', 'CRITICAL INSTRUCTIONS:', '\nConsider', '\nImagine', 'scenario', 'hypothetical', 'rules:', 'programmed', '1.', '2.', 'The assistant', '\nUser:', 'User:', 'Assistant:'],
       num_predict: 50      // Very short - max 50 tokens
     } : {
-      temperature: 0.5,     // Lower for more focused responses
-      top_p: 0.9,          
-      repeat_penalty: 1.1,
+      temperature: 0.4,     // Low for precise, factual responses
+      top_p: 0.85,          
+      repeat_penalty: 1.2,
       num_ctx: 1024,       // Reduced for 8GB RAM - smaller context
-      stop: ['\n\n\nQuestion:', '\n\nUser:', 'User:', 'Assistant:', 'Thank you for'],
-      num_predict: 200     // Increased slightly for complete answers
+      stop: ['\n\nQuestion:', '\n\nUser:', 'User:', 'Assistant:', 'Exercises:', '\n\n1.', '\n\n2.', 'Answer:'],
+      num_predict: 180     // Reduced for shorter, precise answers
     };
 
     const response = await axios.post('http://localhost:11434/api/generate', {
