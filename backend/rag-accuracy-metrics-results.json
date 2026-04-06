@@ -1,0 +1,283 @@
+{
+  "timestamp": "2026-03-16T12:22:01.594Z",
+  "config": {
+    "baseUrl": "http://localhost:5000/api",
+    "topK": 5,
+    "datasetPath": "/Users/yasharthkesarwani/Downloads/project 005/backend/metrics-benchmark-dataset.json",
+    "totalQueries": 12
+  },
+  "performance": {
+    "avgLatencyMs": 6792.73,
+    "p50LatencyMs": 1386.7,
+    "p95LatencyMs": 25127.31,
+    "p99LatencyMs": 25127.31,
+    "avgSourcesReturned": 2.83
+  },
+  "retrievalQuality": {
+    "precisionAtK": 1,
+    "recallAtK": 1,
+    "mrr": 1,
+    "ndcgAtK": 1
+  },
+  "answerQuality": {
+    "keywordCoverage": 0.8889,
+    "faithfulness": 0.8504
+  },
+  "endToEnd": {
+    "successRateProxy": 91.67
+  },
+  "perQuery": [
+    {
+      "id": "q1",
+      "query": "How many worklets have status as average?",
+      "sourceType": "database",
+      "ok": true,
+      "latencyMs": 18.74,
+      "sourcesReturned": 1,
+      "retrieval": {
+        "precisionAtK": 1,
+        "recallAtK": 1,
+        "mrr": 1,
+        "ndcgAtK": 1,
+        "firstRelevantRank": 1
+      },
+      "answerMetrics": {
+        "keywordCoverage": 1,
+        "faithfulness": 1,
+        "faithfulnessMethod": "keyword-coverage-proxy"
+      },
+      "successProxy": true
+    },
+    {
+      "id": "q2",
+      "query": "How many worklets are in IoT domain?",
+      "sourceType": "database",
+      "ok": true,
+      "latencyMs": 13.19,
+      "sourcesReturned": 1,
+      "retrieval": {
+        "precisionAtK": 1,
+        "recallAtK": 1,
+        "mrr": 1,
+        "ndcgAtK": 1,
+        "firstRelevantRank": 1
+      },
+      "answerMetrics": {
+        "keywordCoverage": 1,
+        "faithfulness": 1,
+        "faithfulnessMethod": "keyword-coverage-proxy"
+      },
+      "successProxy": true
+    },
+    {
+      "id": "q3",
+      "query": "What is the status of worklet 001?",
+      "sourceType": "database",
+      "ok": true,
+      "latencyMs": 25127.31,
+      "sourcesReturned": 8,
+      "retrieval": {
+        "precisionAtK": null,
+        "recallAtK": null,
+        "mrr": null,
+        "ndcgAtK": null,
+        "firstRelevantRank": null
+      },
+      "answerMetrics": {
+        "keywordCoverage": 0.6667,
+        "faithfulness": 0.6667,
+        "faithfulnessMethod": "keyword-coverage-proxy"
+      },
+      "successProxy": true
+    },
+    {
+      "id": "q4",
+      "query": "What is the status of worklet 075?",
+      "sourceType": "database",
+      "ok": true,
+      "latencyMs": 17893.18,
+      "sourcesReturned": 8,
+      "retrieval": {
+        "precisionAtK": null,
+        "recallAtK": null,
+        "mrr": null,
+        "ndcgAtK": null,
+        "firstRelevantRank": null
+      },
+      "answerMetrics": {
+        "keywordCoverage": 1,
+        "faithfulness": 1,
+        "faithfulnessMethod": "keyword-coverage-proxy"
+      },
+      "successProxy": true
+    },
+    {
+      "id": "q5",
+      "query": "How many worklets are in Computer Vision domain?",
+      "sourceType": "database",
+      "ok": true,
+      "latencyMs": 2500.31,
+      "sourcesReturned": 1,
+      "retrieval": {
+        "precisionAtK": 1,
+        "recallAtK": 1,
+        "mrr": 1,
+        "ndcgAtK": 1,
+        "firstRelevantRank": 1
+      },
+      "answerMetrics": {
+        "keywordCoverage": 1,
+        "faithfulness": 1,
+        "faithfulnessMethod": "keyword-coverage-proxy"
+      },
+      "successProxy": true
+    },
+    {
+      "id": "q6",
+      "query": "How many total worklets are there?",
+      "sourceType": "database",
+      "ok": true,
+      "latencyMs": 36.4,
+      "sourcesReturned": 1,
+      "retrieval": {
+        "precisionAtK": 1,
+        "recallAtK": 1,
+        "mrr": 1,
+        "ndcgAtK": 1,
+        "firstRelevantRank": 1
+      },
+      "answerMetrics": {
+        "keywordCoverage": 1,
+        "faithfulness": 1,
+        "faithfulnessMethod": "keyword-coverage-proxy"
+      },
+      "successProxy": true
+    },
+    {
+      "id": "q7",
+      "query": "What are the eligibility criteria for PRISM?",
+      "sourceType": "document",
+      "ok": true,
+      "latencyMs": 17308.59,
+      "sourcesReturned": 5,
+      "retrieval": {
+        "precisionAtK": 1,
+        "recallAtK": 1,
+        "mrr": 1,
+        "ndcgAtK": 1,
+        "firstRelevantRank": 1
+      },
+      "answerMetrics": {
+        "keywordCoverage": 1,
+        "faithfulness": 0.6736,
+        "faithfulnessMethod": "token-overlap"
+      },
+      "successProxy": true
+    },
+    {
+      "id": "q8",
+      "query": "What are the different domains?",
+      "sourceType": "database",
+      "ok": true,
+      "latencyMs": 1386.7,
+      "sourcesReturned": 1,
+      "retrieval": {
+        "precisionAtK": 1,
+        "recallAtK": 1,
+        "mrr": 1,
+        "ndcgAtK": 1,
+        "firstRelevantRank": 1
+      },
+      "answerMetrics": {
+        "keywordCoverage": 0,
+        "faithfulness": 0,
+        "faithfulnessMethod": "keyword-coverage-proxy"
+      },
+      "successProxy": false
+    },
+    {
+      "id": "q9",
+      "query": "How many worklets have poor status?",
+      "sourceType": "database",
+      "ok": true,
+      "latencyMs": 183.24,
+      "sourcesReturned": 1,
+      "retrieval": {
+        "precisionAtK": 1,
+        "recallAtK": 1,
+        "mrr": 1,
+        "ndcgAtK": 1,
+        "firstRelevantRank": 1
+      },
+      "answerMetrics": {
+        "keywordCoverage": 1,
+        "faithfulness": 1,
+        "faithfulnessMethod": "keyword-coverage-proxy"
+      },
+      "successProxy": true
+    },
+    {
+      "id": "q10",
+      "query": "How many worklets are in final review stage?",
+      "sourceType": "database",
+      "ok": true,
+      "latencyMs": 70.99,
+      "sourcesReturned": 1,
+      "retrieval": {
+        "precisionAtK": 1,
+        "recallAtK": 1,
+        "mrr": 1,
+        "ndcgAtK": 1,
+        "firstRelevantRank": 1
+      },
+      "answerMetrics": {
+        "keywordCoverage": 1,
+        "faithfulness": 1,
+        "faithfulnessMethod": "keyword-coverage-proxy"
+      },
+      "successProxy": true
+    },
+    {
+      "id": "q11",
+      "query": "What is the purpose of the Samsung PRISM program?",
+      "sourceType": "document",
+      "ok": true,
+      "latencyMs": 13732.65,
+      "sourcesReturned": 5,
+      "retrieval": {
+        "precisionAtK": 1,
+        "recallAtK": 1,
+        "mrr": 1,
+        "ndcgAtK": 1,
+        "firstRelevantRank": 1
+      },
+      "answerMetrics": {
+        "keywordCoverage": 1,
+        "faithfulness": 0.8644,
+        "faithfulnessMethod": "token-overlap"
+      },
+      "successProxy": true
+    },
+    {
+      "id": "q12",
+      "query": "How many worklets have good status?",
+      "sourceType": "database",
+      "ok": true,
+      "latencyMs": 3241.43,
+      "sourcesReturned": 1,
+      "retrieval": {
+        "precisionAtK": 1,
+        "recallAtK": 1,
+        "mrr": 1,
+        "ndcgAtK": 1,
+        "firstRelevantRank": 1
+      },
+      "answerMetrics": {
+        "keywordCoverage": 1,
+        "faithfulness": 1,
+        "faithfulnessMethod": "keyword-coverage-proxy"
+      },
+      "successProxy": true
+    }
+  ]
+}

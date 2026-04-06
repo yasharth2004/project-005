@@ -22,7 +22,7 @@ class VectorStoreService {
   private embeddingPipeline: any = null;
   private isInitialized = false;
   private readonly EMBEDDING_MODEL = 'Xenova/all-MiniLM-L6-v2';
-  private readonly SIMILARITY_THRESHOLD = 0.3;
+  private readonly SIMILARITY_THRESHOLD = 0.4;
 
   /**
    * Initialize the embedding pipeline
@@ -146,7 +146,7 @@ class VectorStoreService {
   }
 
   /**
-   * Search for similar documents using vector similarity
+   * Search for similar documents using vector similarity + keyword boosting
    */
   async searchSimilarDocuments(
     userId: string,
@@ -162,6 +162,15 @@ class VectorStoreService {
       // Generate embedding for the query
       const queryEmbedding = await this.generateEmbedding(queryText);
       console.log(`🧮 Query embedding generated with ${queryEmbedding.length} dimensions`);
+
+      // Extract important keywords from query for boosting
+      const stopWords = new Set(['what', 'is', 'the', 'for', 'how', 'are', 'can', 'do', 'does', 'a', 'an', 'of', 'in', 'to', 'and', 'or', 'about', 'tell', 'me', 'please', 'samsung', 'prism']);
+      const queryKeywords = queryText.toLowerCase()
+        .split(/\s+/)
+        .filter(w => w.length > 2 && !stopWords.has(w))
+        .map(w => w.replace(/[^a-z0-9]/g, ''))
+        .filter(w => w.length > 2);
+      console.log('🔑 Query keywords for boosting:', queryKeywords);
 
       // Find all documents with embeddings for this user and system docs
       const documentsQuery = {
@@ -210,8 +219,26 @@ class VectorStoreService {
         }
 
         try {
-          const similarity = this.calculateCosineSimilarity(queryEmbedding, doc.embedding);
+          let similarity = this.calculateCosineSimilarity(queryEmbedding, doc.embedding);
           validDocuments++;
+
+          // === KEYWORD BOOSTING ===
+          // If the document content contains exact query keywords, boost its score.
+          // This prevents semantically-similar but topically-different chunks from
+          // outranking chunks that literally discuss the queried topic.
+          if (queryKeywords.length > 0) {
+            const contentLower = doc.content.toLowerCase();
+            let keywordHits = 0;
+            for (const kw of queryKeywords) {
+              if (contentLower.includes(kw)) keywordHits++;
+            }
+            const keywordRatio = keywordHits / queryKeywords.length;
+            // Boost up to 15% for chunks that contain query keywords
+            const boost = keywordRatio * 0.15;
+            if (boost > 0) {
+              similarity = Math.min(1.0, similarity + boost);
+            }
+          }
           
           if (similarity >= this.SIMILARITY_THRESHOLD) {
             results.push({

@@ -9,6 +9,7 @@ import {
   isProjectRelatedQuery,
   ProjectSearchResult 
 } from './projectSearchService';
+import { isAnalyticalQuery, executeAnalyticalQuery } from './analyticalQueryService';
 
 export interface SearchResult {
   document: IDocument;
@@ -207,15 +208,17 @@ export const generateResponse = async (
     let hasContent = false;
 
     if (relevantDocs.length > 0) {
-      // Limit context to most relevant chunks and truncate long content
+      // Limit context to most relevant chunks — must fit within num_ctx token budget
+      // With num_ctx=2048, we have ~1400 tokens for context after prompt overhead
+      // 3 chunks × ~400 chars ≈ 300 tokens — safe margin
       const docContext = relevantDocs
-        .slice(0, 5) // Use top 5 most relevant documents for better coverage
+        .slice(0, 3) // Top 3 most relevant — keeps total context within model's window
         .map(result => {
           const doc = result.document;
           const fileName = (doc as any).fileId?.originalName || doc.metadata.fileName;
-          // Truncate content to avoid overwhelming context
-          const truncatedContent = doc.content.length > 500 
-            ? doc.content.substring(0, 500) + '...' 
+          // Truncate content — 400 chars ≈ 100 tokens per chunk
+          const truncatedContent = doc.content.length > 400 
+            ? doc.content.substring(0, 400) + '...' 
             : doc.content;
           return `[Source: ${fileName}]\n${truncatedContent}`;
         })
@@ -376,6 +379,8 @@ Question: ${query}
 Instructions:
 - Answer directly using only facts from the context above
 - Include: worklet title, domain, institution, team members, mentors, professors, status, and review stage
+- IMPORTANT: "Status" (Good/Average/Poor) is DIFFERENT from "Review Stage" (Mid Review/Final Review). Do NOT confuse them.
+- When asked about "status", report the Status field. When asked about "stage" or "review", report the Review Stage field.
 - Use 1-2 short paragraphs maximum
 - Be specific and factual
 - Do NOT add exercises, quizzes, or questions at the end
@@ -469,22 +474,35 @@ Your Response:`;
       stop: ['\n\n', '\nQuestion:', '\nUser:', 'Context:', 'Instructions:', 'Response Guidelines:', 'CRITICAL INSTRUCTIONS:', '\nConsider', '\nImagine', 'scenario', 'hypothetical', 'rules:', 'programmed', '1.', '2.', 'The assistant', '\nUser:', 'User:', 'Assistant:'],
       num_predict: 50      // Very short - max 50 tokens
     } : {
-      temperature: 0.4,     // Low for precise, factual responses
-      top_p: 0.85,          
-      repeat_penalty: 1.2,
-      num_ctx: 1024,       // Reduced for 8GB RAM - smaller context
+      temperature: 0.3,     // Lower for more precise, factual responses (was 0.4)
+      top_p: 0.8,          
+      repeat_penalty: 1.3,  // Slightly higher to reduce repetitive hallucinations
+      num_ctx: 2048,       // Increased so document context actually fits (was 1024 — too small)
       stop: ['\n\nQuestion:', '\n\nUser:', 'User:', 'Assistant:', 'Exercises:', '\n\n1.', '\n\n2.', 'Answer:'],
-      num_predict: 180     // Reduced for shorter, precise answers
+      num_predict: 200     // Slightly more room for complete answers
     };
 
-    const response = await axios.post('http://localhost:11434/api/generate', {
-      model: 'phi',
-      prompt,
-      stream: false,
-      options: modelOptions
-    }, {
-      timeout: 60000
-    });
+    // Attempt generation with one automatic retry on timeout to handle transient Ollama slowdowns
+    let rawOllamaResponse: any;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        rawOllamaResponse = await axios.post('http://localhost:11434/api/generate', {
+          model: 'phi',
+          prompt,
+          stream: false,
+          options: attempt === 1 ? modelOptions : { ...modelOptions, num_predict: 100, temperature: 0.1 }
+        }, {
+          timeout: attempt === 1 ? 70000 : 40000
+        });
+        break; // success — exit retry loop
+      } catch (attemptError: any) {
+        if (attempt === 2) throw attemptError; // re-throw on second failure
+        const isTimeout = attemptError.code === 'ECONNABORTED' || attemptError.message?.includes('timeout');
+        if (!isTimeout) throw attemptError; // only retry on timeouts
+        console.warn(`⚠️ Ollama attempt ${attempt} timed out — retrying with shorter output limit...`);
+      }
+    }
+    const response = rawOllamaResponse;
 
     if (!response.data || !response.data.response) {
       throw new Error('Invalid response format from Ollama');
@@ -553,6 +571,54 @@ Your Response:`;
       return "I can provide information about that worklet. Please ask a specific question about what you'd like to know.";
     }
 
+    // Context-grounding check: if we HAD context but the response doesn't reference
+    // ANY words from the context, the model likely ignored the documents and hallucinated.
+    // Skip this check for structured/DB-backed context (contains field labels like "Status:" or
+    // "Domain:") since those answers are factual even if token overlap is low.
+    const isStructuredContext = /Status \(e\.g\.|Review Stage|Domain:|Worklet ID:/i.test(context);
+    if (hasContent && context.length > 50 && !isStructuredContext) {
+      const contextWords = new Set(
+        context.toLowerCase().split(/\s+/).filter(w => w.length > 5)
+      );
+      const responseWords = generatedResponse.toLowerCase().split(/\s+/).filter((w: string) => w.length > 5);
+      const overlapCount = responseWords.filter((w: string) => contextWords.has(w)).length;
+      const overlapRatio = responseWords.length > 0 ? overlapCount / responseWords.length : 0;
+      
+      console.log(`🔍 Context-grounding check: ${overlapCount}/${responseWords.length} words overlap (${(overlapRatio * 100).toFixed(1)}%)`);
+      
+      // Only fire if response is substantial (>20 content words) AND overlap is near-zero (<3%)
+      // A higher word-count floor avoids penalising short, specific, correct answers.
+      if (overlapRatio < 0.03 && responseWords.length > 20) {
+        console.warn('⚠️ Response appears ungrounded in context — low word overlap. Regenerating with stricter prompt...');
+        
+        // Build a tighter fallback: extract first ~200 chars of context as a summary
+        const contextSnippet = context.substring(0, 600);
+        const fallbackPrompt = `Based ONLY on this text, answer the question in 1-2 sentences. Do NOT use outside knowledge.\n\nText: ${contextSnippet}\n\nQuestion: ${query}\n\nAnswer:`;
+        
+        try {
+          const retryResponse = await axios.post('http://localhost:11434/api/generate', {
+            model: 'phi',
+            prompt: fallbackPrompt,
+            stream: false,
+            options: {
+              temperature: 0.1,
+              top_p: 0.5,
+              num_ctx: 2048,
+              num_predict: 150,
+              stop: ['\n\nQuestion:', '\n\nUser:', 'User:', 'Answer:']
+            }
+          }, { timeout: 60000 });
+          
+          if (retryResponse.data?.response?.trim()) {
+            console.log('✅ Fallback response generated');
+            return retryResponse.data.response.trim();
+          }
+        } catch (retryError) {
+          console.error('❌ Fallback generation failed:', retryError);
+        }
+      }
+    }
+
     return generatedResponse;
   } catch (error) {
     console.error('❌ Error generating response:', error);
@@ -593,6 +659,31 @@ export const generateRAGResponse = async (
       console.log('🔖 User worklet ID:', user.workletId);
     } else {
       console.log('⚠️ No worklet ID found for user');
+    }
+
+    // ===== ANALYTICAL QUERY CHECK (counts, aggregations, stats) =====
+    // Must run before document search to return exact DB numbers
+    if (isAnalyticalQuery(query)) {
+      console.log('📊 Analytical query detected — routing to analytical engine');
+      const analyticalResult = await executeAnalyticalQuery(query);
+
+      if (analyticalResult.isAnalytical && analyticalResult.answer) {
+        console.log('📊 Analytical answer generated successfully');
+        addToMemory(userId, query, analyticalResult.answer);
+
+        return {
+          answer: analyticalResult.answer,
+          sources: [{
+            content: JSON.stringify(analyticalResult.data, null, 2),
+            fileName: 'Database Aggregation',
+            chunkIndex: 0,
+            relevanceScore: 1.0
+          }],
+          query
+        };
+      }
+      // If analytical engine couldn't handle it, fall through to normal RAG
+      console.log('📊 Analytical engine could not handle query — falling through to RAG');
     }
 
     // Detect if query is a simple greeting or farewell (short queries without specific questions)

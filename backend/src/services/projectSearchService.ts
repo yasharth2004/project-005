@@ -150,8 +150,8 @@ export const formatProjectResultsForRAG = (results: ProjectSearchResult[]): stri
     projectInfo += `Title: ${project.workletTitle}\n`;
     projectInfo += `Domain: ${project.domain}\n`;
     projectInfo += `Institution: ${project.college}\n`;
-    projectInfo += `Current Status: ${project.status}\n`;
-    projectInfo += `Stage: ${project.stage}\n`;
+    projectInfo += `Status (e.g. Good/Average/Poor): ${project.status}\n`;
+    projectInfo += `Review Stage (e.g. Mid Review/Final Review): ${project.stage}\n`;
     
     if (project.mentors && project.mentors.length > 0) {
       projectInfo += `Mentors: ${project.mentors.join(", ")}\n`;
@@ -167,4 +167,71 @@ export const formatProjectResultsForRAG = (results: ProjectSearchResult[]): stri
     
     return projectInfo;
   }).join("\n\n---\n\n");
+};
+
+// ============================================================
+// Aggregation helpers for analytical queries
+// ============================================================
+
+/**
+ * Count projects matching a filter on a specific field
+ */
+export const countProjectsByField = async (
+  field: string,
+  value: string,
+  userFilter: any = {}
+): Promise<{ count: number; total: number }> => {
+  const filter = { ...userFilter, [field]: { $regex: new RegExp(value, 'i') } };
+  const [count, total] = await Promise.all([
+    Project.countDocuments(filter),
+    Project.countDocuments(userFilter)
+  ]);
+  return { count, total };
+};
+
+/**
+ * Get distribution (group-by count) of a field
+ */
+export const getFieldDistribution = async (
+  field: string,
+  userFilter: any = {}
+): Promise<Array<{ _id: string; count: number }>> => {
+  const pipeline: any[] = [];
+  if (Object.keys(userFilter).length > 0) {
+    pipeline.push({ $match: userFilter });
+  }
+  pipeline.push(
+    { $group: { _id: `$${field}`, count: { $sum: 1 } } },
+    { $sort: { count: -1 } }
+  );
+  return Project.aggregate(pipeline);
+};
+
+/**
+ * Get overall project/worklet statistics
+ */
+export const getProjectStats = async (userFilter: any = {}): Promise<{
+  total: number;
+  statusCounts: Record<string, number>;
+  stageCounts: Record<string, number>;
+  domainCount: number;
+  collegeCount: number;
+}> => {
+  const matchStage = Object.keys(userFilter).length > 0 ? [{ $match: userFilter }] : [];
+
+  const [total, statusDist, stageDist, domains, colleges] = await Promise.all([
+    Project.countDocuments(userFilter),
+    Project.aggregate([...matchStage, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+    Project.aggregate([...matchStage, { $group: { _id: '$stage', count: { $sum: 1 } } }]),
+    Project.distinct('domain', userFilter),
+    Project.distinct('college', userFilter)
+  ]);
+
+  const statusCounts: Record<string, number> = {};
+  statusDist.forEach(s => { statusCounts[s._id || 'Unknown'] = s.count; });
+
+  const stageCounts: Record<string, number> = {};
+  stageDist.forEach(s => { stageCounts[s._id || 'Unknown'] = s.count; });
+
+  return { total, statusCounts, stageCounts, domainCount: domains.length, collegeCount: colleges.length };
 };

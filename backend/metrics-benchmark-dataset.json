@@ -1,0 +1,86 @@
+[
+  {
+    "id": "q1",
+    "query": "How many worklets have status as average?",
+    "sourceType": "database",
+    "expectedSourceHints": ["Database Aggregation"],
+    "expectedAnswerKeywords": ["worklets", "status", "average"]
+  },
+  {
+    "id": "q2",
+    "query": "How many worklets are in IoT domain?",
+    "sourceType": "database",
+    "expectedSourceHints": ["Database Aggregation"],
+    "expectedAnswerKeywords": ["worklets", "domain", "iot"]
+  },
+  {
+    "id": "q3",
+    "query": "What is the status of worklet 001?",
+    "sourceType": "database",
+    "expectedSourceHints": [],
+    "expectedAnswerKeywords": ["worklet", "001", "status"]
+  },
+  {
+    "id": "q4",
+    "query": "What is the status of worklet 075?",
+    "sourceType": "database",
+    "expectedSourceHints": [],
+    "expectedAnswerKeywords": ["worklet", "075", "status"]
+  },
+  {
+    "id": "q5",
+    "query": "How many worklets are in Computer Vision domain?",
+    "sourceType": "database",
+    "expectedSourceHints": ["Database Aggregation"],
+    "expectedAnswerKeywords": ["worklets", "computer", "vision"]
+  },
+  {
+    "id": "q6",
+    "query": "How many total worklets are there?",
+    "sourceType": "database",
+    "expectedSourceHints": ["Database Aggregation"],
+    "expectedAnswerKeywords": ["total", "worklets"]
+  },
+  {
+    "id": "q7",
+    "query": "What are the eligibility criteria for PRISM?",
+    "sourceType": "document",
+    "expectedSourceHints": ["Samsung PRISM Program Overview"],
+    "expectedAnswerKeywords": ["prism", "eligible", "students"]
+  },
+  {
+    "id": "q8",
+    "query": "What are the different domains?",
+    "sourceType": "database",
+    "expectedSourceHints": ["Database Aggregation"],
+    "expectedAnswerKeywords": ["domains"]
+  },
+  {
+    "id": "q9",
+    "query": "How many worklets have poor status?",
+    "sourceType": "database",
+    "expectedSourceHints": ["Database Aggregation"],
+    "expectedAnswerKeywords": ["worklets", "poor", "status"]
+  },
+  {
+    "id": "q10",
+    "query": "How many worklets are in final review stage?",
+    "sourceType": "database",
+    "expectedSourceHints": ["Database Aggregation"],
+    "expectedAnswerKeywords": ["worklets", "final", "review"]
+  },
+  {
+    "id": "q11",
+    "query": "What is the purpose of the Samsung PRISM program?",
+    "sourceType": "document",
+    "expectedSourceHints": ["Samsung PRISM Program Overview"],
+    "expectedAnswerKeywords": ["samsung", "prism", "program", "research"]
+  },
+  {
+    "id": "q12",
+    "query": "How many worklets have good status?",
+    "sourceType": "database",
+    "expectedSourceHints": ["Database Aggregation"],
+    "expectedAnswerKeywords": ["worklets", "good", "status"]
+  }
+]
