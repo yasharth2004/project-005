@@ -221,12 +221,36 @@ export const parseAnalyticalIntent = (query: string): ParsedIntent => {
             console.log(`📊     Recognized college: ${segmentDetectedValue}`);
           }
 
-          const domainMatch = segment.match(domainKeywords);
-          if (!segmentDetectedValue && domainMatch && /(?:domain|have|with|technology|skill)/i.test(segment)) {
-            segmentDetectedField = 'domain';
-            segmentDetectedValue = domainMatch[1];
-            segmentDetectedDbField = 'domain';
-            console.log(`📊     Recognized domain: ${segmentDetectedValue}`);
+          // Check for known domains in this segment (collect ALL, not just first)
+          if (!segmentDetectedValue && /(?:domain|have|with|technology|skill)/i.test(segment)) {
+            const foundDomains: string[] = [];
+            // Known domains list for multi-value detection (ORDERED: longest first for greedy matching)
+            const knownDomainsList = [
+              'computer vision', 'ondevice intelligence', 'communication network', 'language ai',
+              'iot', 'ai', 'ml', 'blockchain', 'nlp', 'cloud', 'mobile', 'web', 'data', 'vision', 
+              'automation', 'embedded', 'security', 'devops', 'cv'
+            ];
+            
+            for (const domain of knownDomainsList) {
+              // Use case-insensitive test that handles multi-word domains
+              // For multi-word domains, escape spaces; for single-word, use word boundaries
+              const isMultiWord = domain.includes(' ');
+              const pattern = isMultiWord 
+                ? new RegExp(domain, 'i')  // Multi-word: simple substring match
+                : new RegExp(`\\b${domain}\\b`, 'i');  // Single-word: word boundary
+              
+              if (pattern.test(segment)) {
+                foundDomains.push(domain);
+              }
+            }
+            
+            if (foundDomains.length > 0) {
+              segmentDetectedField = 'domain';
+              segmentDetectedValue = foundDomains[0];
+              segmentDetectedValues = foundDomains;  // Store ALL domains found
+              segmentDetectedDbField = 'domain';
+              console.log(`📊     Recognized known domains: ${JSON.stringify(foundDomains)}`);
+            }
           }
         }
 
@@ -615,6 +639,43 @@ export const parseAnalyticalIntent = (query: string): ParsedIntent => {
     }
   }
 
+  // Also check for multiple domains
+  if (!detectedValue) {
+    const foundDomains: string[] = [];
+    const knownDomainsList = [
+      'computer vision', 'ondevice intelligence', 'communication network', 'language ai',
+      'iot', 'ai', 'ml', 'blockchain', 'nlp', 'cloud', 'mobile', 'web', 'data', 'vision', 
+      'automation', 'embedded', 'security', 'devops', 'cv'
+    ];
+    
+    for (const domain of knownDomainsList) {
+      // Use case-insensitive test that handles multi-word domains
+      const isMultiWord = domain.includes(' ');
+      const pattern = isMultiWord 
+        ? new RegExp(domain, 'i')  // Multi-word: simple substring match
+        : new RegExp(`\\b${domain}\\b`, 'i');  // Single-word: word boundary
+      
+      if (pattern.test(clean)) {
+        foundDomains.push(domain);
+      }
+    }
+    
+    if (foundDomains.length >= 2) {
+      // Multi-domain query detected
+      detectedField = 'domain';
+      detectedValue = foundDomains[0];
+      detectedDbField = 'domain';
+      detectedValues = foundDomains;
+      console.log(`📊 Pattern D (multi-domain) matched: ${JSON.stringify(foundDomains)}`);
+    } else if (foundDomains.length === 1) {
+      // Single domain query
+      detectedField = 'domain';
+      detectedValue = foundDomains[0];
+      detectedDbField = 'domain';
+      console.log(`📊 Pattern D (known domain) matched: "${foundDomains[0]}"`);
+    }
+  }
+
   // ===== PATTERN E: Last resort — extract non-stop words and search all fields =====
   // e.g. "how many worklets have IoT" — no field keyword at all
   if (!detectedValue) {
@@ -636,14 +697,31 @@ export const parseAnalyticalIntent = (query: string): ParsedIntent => {
   if (!detectedValues && detectedValue) {
     // If detectedValues weren't already set (e.g., by Pattern D), try to find more field values
     if (detectedField && detectedDbField) {
-      // Look in the ORIGINAL query to see if there are related multi-value patterns with the same field
-      // e.g., query="how many have good and bad status", field="status"
-      // We want to extract all known values of this field
-      let checkList = detectedField === 'status' ? KNOWN_STATUSES : (detectedField === 'stage' ? KNOWN_STAGES : []);
+      let checkList: string[] = [];
+      
+      // Determine the check list based on detected field type
+      if (detectedField === 'status') {
+        checkList = KNOWN_STATUSES;
+      } else if (detectedField === 'stage') {
+        checkList = KNOWN_STAGES;
+      } else if (detectedField === 'domain') {
+        checkList = [
+          'computer vision', 'ondevice intelligence', 'communication network', 'language ai',
+          'iot', 'ai', 'ml', 'blockchain', 'nlp', 'cloud', 'mobile', 'web', 'data', 'vision', 
+          'automation', 'embedded', 'security', 'devops', 'cv'
+        ];
+      }
+      
       const foundVals: string[] = [];
       
       for (const val of checkList) {
-        if (new RegExp(`\\b${val}\\b`, 'i').test(clean)) {
+        // For multi-word domains, use substring match; for single words, use word boundary
+        const isMultiWord = val.includes(' ');
+        const pattern = isMultiWord 
+          ? new RegExp(val, 'i')  // Multi-word: simple substring match
+          : new RegExp(`\\b${val}\\b`, 'i');  // Single-word: word boundary
+        
+        if (pattern.test(clean)) {
           foundVals.push(val);
         }
       }
