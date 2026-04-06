@@ -321,23 +321,28 @@ Always provide specific details about THEIR worklet, not general information abo
         // General program information - answer from documents regardless of user role
         // This has the highest priority - even if project results exist, ignore them for general queries
         console.log('📝 Selected prompt type: GENERAL PROGRAM QUERY (highest priority)');
-        prompt = `You are an AI assistant for Samsung PRISM program.
+        prompt = `You are an AI assistant for Samsung PRISM program answering about program-level information.
 ${conversationContext}
 Context:
 ${context}
 
 Question: ${query}
 
-Instructions:
-- Answer using ONLY facts from the context above
-- Be direct and concise (1-2 short paragraphs maximum)
-- State exactly what the documents say
-- If information is limited, say: "Based on available documents, [what you found]"
-- Do NOT create hypothetical situations (no "Consider...", "Imagine...", "Let's say...")
-- Do NOT invent examples with College A/B/C, people names, or scenarios
-- Do NOT make up requirements, rules, or constraints
-- Do NOT create numbered lists unless they exist in the context
-- Stop immediately after answering
+CRITICAL INSTRUCTIONS:
+1. Answer using ONLY explicit facts from the context above
+2. If the question is about eligibility, criteria, or requirements:
+   - ONLY state what is explicitly written in documents
+   - Do NOT mix in worklet information, domain names, or project counts
+   - Example: If document doesn't say "Must be from XYZ college", DO NOT mention it
+3. Be direct and concise (1-2 short paragraphs maximum)
+4. Forbidden patterns:
+   - No hypothetical situations ("Consider...", "Imagine...", "Let's say...", "For example")
+   - No invented examples with names (College A/B/C, people names, scenarios)
+   - No made-up requirements, rules, or constraints
+   - No numbered lists unless they exist in source
+   - No mixing program criteria with worklet/domain details
+5. If your context doesn't address the question, say: "I don't have specific information about this in available documents"
+6. Stop immediately after direct answer - no extra suggestions or additions
 
 Answer:`;
       } else if (isPersonalWorkletQuery && userContext?.user?.role === 'student') {
@@ -556,7 +561,14 @@ Your Response:`;
       /\d+\.\s+Dr\.\s+\w+\s+\w+\s+-\s+.*\(ID\s+\d+\)/i, // Fake numbered mentor lists
       /mentor'?s ID number/i,
       /specific area of expertise:/i,
-      /if a request is made about worklet ID/i
+      /if a request is made about worklet ID/i,
+      // NEW: Detect mixing of worklet information with eligibility criteria
+      /(eligibility|criteria|requirements|qualif)[^.]*?(?:domain|worklet|worksheet|IoT|ML|AI|Computer Vision)/i,
+      /(eligibility|criteria|requirements|qualif)[^.]*?(?:\d+\s+worklet|\d+\s+worksheet)/i,
+      /(eligibility|role|department|college).*?\bfrom\s+(?:various|multiple)\s+domains/i,
+      /(?:211|212|223|290|345|500).*(?:worklet|worksheet).*(?:eligibility|criteria|requirement)/i, // Mixing specific numbers with criteria
+      /(eligibility|qualif).*?\b(?:IoT|AI|ML|domain|college)\b.*?worklet/i,
+      /requirement.*?\b(?:IoT|Computer Vision)\b|(?:IoT|Computer Vision).*?\brequirement/i
     ];
     
     const hasGlobalHallucination = globalHallucinationPatterns.some(pattern => pattern.test(generatedResponse));
@@ -889,6 +901,50 @@ export const generateRAGResponse = async (
         }
       } catch (projectError) {
         console.error('❌ Error searching projects:', projectError);
+      }
+    }
+
+    // ===== GROUNDING CHECK FOR GENERAL PROGRAM QUERIES =====
+    // For eligibility/criteria questions, verify documents actually contain relevant content
+    // This prevents hallucinations when documents discuss worklets but not eligibility
+    if (isGeneralProgramQuery && relevantDocs.length > 0) {
+      const eligibilityKeywords = ['eligibility', 'eligible', 'qualify', 'qualification', 'requirement', 'criteria', 
+                                   'prerequisite', 'admission', 'selection', 'apply', 'application',
+                                   'qualif', 'how to apply', 'how to join'];
+      
+      // Check if any of the top documents contain eligibility-related keywords
+      const topDocContent = relevantDocs.slice(0, 3)
+        .map(d => d.document.content.toLowerCase())
+        .join(' ');
+      
+      const hasEligibilityContent = eligibilityKeywords.some(keyword => topDocContent.includes(keyword.toLowerCase()));
+      const averageRelevance = relevantDocs.slice(0, 3).reduce((sum, d) => sum + d.relevanceScore, 0) / Math.min(3, relevantDocs.length);
+      
+      console.log(`🔍 Grounding Check for General Query:`);
+      console.log(`   Query: "${query}"`);
+      console.log(`   Query keywords: ${eligibilityKeywords.filter(k => query.toLowerCase().includes(k)).join(', ') || 'none matched'}`);
+      console.log(`   Document contains eligibility keywords: ${hasEligibilityContent}`);
+      console.log(`   Average relevance score (top 3): ${averageRelevance.toFixed(3)}`);
+      
+      // If documents don't contain relevant keywords AND relevance is low, reject the answer
+      if (!hasEligibilityContent && averageRelevance < 0.3) {
+        console.log(`🚫 GROUNDING FAILURE: Documents don't contain eligibility information (average relevance: ${averageRelevance.toFixed(3)})`);
+        console.log(`   Top documents discuss: ${relevantDocs.slice(0, 2).map((d, i) => `Doc${i+1}: ${(d.document as any).fileId?.originalName || 'Unknown'}`).join(', ')}`);
+        
+        const groundingFailureAnswer = `I don't have specific information about eligibility criteria in my available documents. For details about Samsung PRISM eligibility requirements, please contact:
+- Your program coordinator
+- Check the official Samsung PRISM website
+- Review the program documentation provided at enrollment
+
+Is there something else about the program or your worklet that I can help you with?`;
+        
+        addToMemory(userId, query, groundingFailureAnswer);
+        
+        return {
+          answer: groundingFailureAnswer,
+          sources: [],
+          query
+        };
       }
     }
 

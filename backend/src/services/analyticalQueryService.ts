@@ -32,7 +32,7 @@ const QUERYABLE_FIELDS: Record<string, string> = {
 const ALL_FIELD_KEYWORDS = Object.keys(QUERYABLE_FIELDS);
 
 // Known status values (case-insensitive matching)
-const KNOWN_STATUSES = ['excellent', 'good', 'average', 'below average', 'poor', 'active', 'completed', 'dropped', 'ongoing', 'review', 'inactive'];
+const KNOWN_STATUSES = ['excellent', 'very good', 'good', 'average', 'below average', 'poor', 'bad', 'active', 'completed', 'dropped', 'ongoing', 'review', 'inactive'];
 const KNOWN_STAGES = ['review', 'development', 'testing', 'completed', 'planning', 'deployment', 'initial', 'final', 'midterm', 'ongoing'];
 
 // Stop words that should never be detected as a value
@@ -69,6 +69,26 @@ const cleanExtractedValue = (value: string): string => {
     }
   }
   return cleaned;
+};
+
+/**
+ * Extract multiple values from a query segment.
+ * e.g., "good and bad" → ["good", "bad"]
+ *       "good/bad/average" → ["good", "bad", "average"]
+ *       "good or bad" → ["good", "bad"]
+ *       "good, bad, and average" → ["good", "bad", "average"]
+ */
+const extractMultipleValues = (segment: string): string[] => {
+  // Replace common separators with pipe for uniform splitting
+  let normalized = segment
+    .replace(/\s+and\s+/gi, '|')        // " and " → |
+    .replace(/\s+or\s+/gi, '|')         // " or " → |
+    .replace(/[/,]+/g, '|')             // / or , → |
+    .split('|')
+    .map(v => cleanExtractedValue(v.trim()))
+    .filter(v => v.length > 0 && !STOP_WORDS.has(v.toLowerCase()));
+  
+  return normalized.length > 1 ? normalized : [];
 };
 
 // ============================================================
@@ -116,11 +136,22 @@ export const isAnalyticalQuery = (query: string): boolean => {
 // 2. Parse intent from the query
 // ============================================================
 
+interface Constraint {
+  field: string;        // e.g., "status", "domain"
+  dbField: string;      // actual MongoDB field name
+  values: string[];     // e.g., ["poor", "average"]
+  multiValue: boolean;  // true if multiple values in this constraint
+}
+
 interface ParsedIntent {
   type: 'count_filtered' | 'distribution' | 'total_count' | 'list_unique' | 'comparison' | 'unknown';
-  field?: string;       // e.g., "status", "domain"
-  value?: string;       // e.g., "average", "good"
-  dbField?: string;     // actual MongoDB field name
+  field?: string;       // e.g., "status", "domain" (for backward compat - single field)
+  value?: string;       // e.g., "average", "good" (for backward compat)
+  values?: string[];    // e.g., ["good", "average"] for multi-value queries
+  multiValue?: boolean; // true if multiple values were detected
+  dbField?: string;     // actual MongoDB field name (for backward compat)
+  constraints?: Constraint[]; // NEW: for compound multi-field queries
+  isCompound?: boolean; // NEW: true if this is a compound query (multiple fields)
 }
 
 export const parseAnalyticalIntent = (query: string): ParsedIntent => {
@@ -130,7 +161,225 @@ export const parseAnalyticalIntent = (query: string): ParsedIntent => {
 
   console.log('📊 parseAnalyticalIntent input:', clean);
 
-  // ------- DISTRIBUTION / BREAKDOWN -------
+  // ===== COMPOUND QUERY PREPROCESSING =====
+  // If query contains " and " OR has multiple field indicators, try extracting multiple constraints
+  // e.g., "from SRM and have status as poor" → ["from SRM", "have status as poor"]
+  // e.g., "from VIT with poor status" → ["from VIT", "with poor status"]
+  const constraints: Constraint[] = [];
+  
+  // Check for " and " OR "from/with/have" patterns that suggest multiple fields
+  const hasAndSeparator = /\s+and\s+/i.test(clean);
+  const hasMultipleFieldIndicators = /(?:from|in|at)\s+.*?(?:with|have|having)\s+/i.test(clean);
+  
+  if ((hasAndSeparator || hasMultipleFieldIndicators) && /(?:status|stage|domain|college|mentor|student|professor)/i.test(clean)) {
+    console.log(`📊 Compound query candidate detected (and=${hasAndSeparator}, multi-indicators=${hasMultipleFieldIndicators})`);
+    
+    // Split by " and " OR identify boundaries between prep + "with/have"
+    let segments: string[] = [];
+    
+    if (hasAndSeparator) {
+      segments = clean.split(/\s+and\s+/);
+    } else if (hasMultipleFieldIndicators) {
+      // Pattern: "from/in/at VALUE with/have VALUE FIELD"
+      // Split after first "with" or "have" keyword
+      const splitMatch = clean.match(/^(.*?)\s+(?:with|have|having)\s+(.+)$/i);
+      if (splitMatch) {
+        segments = [splitMatch[1], splitMatch[2]];
+        console.log(`📊 Multi-field pattern detected: ["${segments[0]}", "${segments[1]}"]`);
+      }
+    }
+    
+    if (segments.length > 0) {
+      console.log(`📊 Decomposed into ${segments.length} segments: ${JSON.stringify(segments)}`);
+
+      // Known college patterns
+      const collegeNames = /\b(vit|psg|srm|bits|iit|nit|kiit|jntu|anna|iitm|iitd|iitkgp|iitkbt|iitr|iitb|iitp|iithy|iitbhu|iitgn|iitmdr|iitph|iitgoa|manipal|amrita|christ|symbiosis|lovely|pdf|punjabi|delhi|jmi)\b/i;
+      const domainKeywords = /\b(iot|ai|ml|blockchain|nlp|cloud|mobile|web|data|vision|automation|embedded|security|devops|cv|computer vision)\b/i;
+
+      // For each segment, try to extract ONE field+value pair
+      for (let idx = 0; idx < segments.length; idx++) {
+        const segment = segments[idx].trim();
+        console.log(`📊   Segment ${idx + 1}: "${segment}"`);
+
+        let segmentDetectedField: string | undefined;
+        let segmentDetectedValue: string | undefined;
+        let segmentDetectedDbField: string | undefined;
+        let segmentDetectedValues: string[] | undefined;
+
+        // First, check if this segment is about a known college or domain
+        if (!segmentDetectedValue) {
+          const collegeMatch = segment.match(collegeNames);
+          if (collegeMatch && /(?:from|in|at|with|have|college|university|institution)/i.test(segment)) {
+            segmentDetectedField = 'college';
+            segmentDetectedValue = collegeMatch[1];
+            segmentDetectedDbField = 'college';
+            console.log(`📊     Recognized college: ${segmentDetectedValue}`);
+          }
+
+          const domainMatch = segment.match(domainKeywords);
+          if (!segmentDetectedValue && domainMatch && /(?:domain|have|with|technology|skill)/i.test(segment)) {
+            segmentDetectedField = 'domain';
+            segmentDetectedValue = domainMatch[1];
+            segmentDetectedDbField = 'domain';
+            console.log(`📊     Recognized domain: ${segmentDetectedValue}`);
+          }
+        }
+
+        // Check for known statuses in this segment (collect ALL, not just first)
+        if (!segmentDetectedValue) {
+          const foundStatuses: string[] = [];
+          for (const status of KNOWN_STATUSES) {
+            if (new RegExp(`\\b${status}\\b`, 'i').test(segment)) {
+              foundStatuses.push(status);
+            }
+          }
+          if (foundStatuses.length > 0) {
+            segmentDetectedField = 'status';
+            segmentDetectedValue = foundStatuses[0];
+            segmentDetectedValues = foundStatuses;
+            segmentDetectedDbField = 'status';
+            console.log(`📊     Recognized known statuses: ${JSON.stringify(foundStatuses)}`);
+          }
+        }
+
+        // Check for known stages in this segment (collect ALL, not just first)
+        if (!segmentDetectedValue) {
+          const foundStages: string[] = [];
+          for (const stage of KNOWN_STAGES) {
+            if (new RegExp(`\\b${stage}\\b`, 'i').test(segment) && !KNOWN_STATUSES.includes(stage)) {
+              foundStages.push(stage);
+            }
+          }
+          if (foundStages.length > 0) {
+            segmentDetectedField = 'stage';
+            segmentDetectedValue = foundStages[0];
+            segmentDetectedValues = foundStages;
+            segmentDetectedDbField = 'stage';
+            console.log(`📊     Recognized known stages: ${JSON.stringify(foundStages)}`);
+          }
+        }
+
+        // Try each pattern on this segment if not already detected
+        if (!segmentDetectedValue) {
+          for (const [keyword, dbField] of Object.entries(QUERYABLE_FIELDS)) {
+            // Pattern 1: "VALUE as FIELD"
+            const p1 = new RegExp(`(?:have|with|having)\\s+["']?([\\w\\s&/-]+?)["']?\\s+(?:as|for)\\s+(?:their\\s+|the\\s+)?${keyword}`, 'i');
+            let match = segment.match(p1);
+            if (match && match[1]) {
+              const candidate = cleanExtractedValue(match[1]);
+              if (candidate && !STOP_WORDS.has(candidate.toLowerCase())) {
+                segmentDetectedField = keyword;
+                segmentDetectedValue = candidate;
+                segmentDetectedDbField = dbField;
+                console.log(`📊     Segment pattern 1 matched: ${keyword} = "${candidate}"`);
+                break;
+              }
+            }
+
+            // Pattern 2: "FIELD VALUE" or "FIELD as VALUE"
+            if (!segmentDetectedValue) {
+              const p2 = new RegExp(`${keyword}\\s+(?:as\\s+)?["']?([\\w\\s&/-]+?)["']?$`, 'i');
+              match = segment.match(p2);
+              if (match && match[1]) {
+                const candidate = cleanExtractedValue(match[1]);
+                if (candidate && !STOP_WORDS.has(candidate.toLowerCase())) {
+                  segmentDetectedField = keyword;
+                  segmentDetectedValue = candidate;
+                  segmentDetectedDbField = dbField;
+                  console.log(`📊     Segment pattern 2 matched: ${keyword} = "${candidate}"`);
+                  break;
+                }
+              }
+            }
+
+            // Pattern 3: "from/at/in VALUE FIELD"
+            if (!segmentDetectedValue) {
+              const p3 = new RegExp(`(?:from|at|in|with)\\s+(?:the\\s+)?["']?([\\w\\s&/-]+?)["']?\\s+${keyword}`, 'i');
+              match = segment.match(p3);
+              if (match && match[1]) {
+                const candidate = cleanExtractedValue(match[1]);
+                if (candidate && !STOP_WORDS.has(candidate.toLowerCase())) {
+                  segmentDetectedField = keyword;
+                  segmentDetectedValue = candidate;
+                  segmentDetectedDbField = dbField;
+                  console.log(`📊     Segment pattern 3 matched: ${keyword} = "${candidate}"`);
+                  break;
+                }
+              }
+            }
+
+            if (segmentDetectedValue) break;
+          }
+        }
+
+        // If we found a constraint in this segment, add it
+        if (segmentDetectedField && segmentDetectedValue && segmentDetectedDbField) {
+          // Check for multi-values (e.g., "good and poor" in the segment)
+          const multiVals = extractMultipleValues(segmentDetectedValue);
+          constraints.push({
+            field: segmentDetectedField,
+            dbField: segmentDetectedDbField,
+            values: multiVals.length > 0 ? multiVals : [segmentDetectedValue],
+            multiValue: multiVals.length > 1
+          });
+        }
+      }
+    }
+
+    // If we found multiple constraints, check if they're for the SAME field
+    // e.g., "from VIT and PSG college" → should be ONE constraint with multiValue=true
+    if (constraints.length > 1) {
+      // Group constraints by dbField
+      const constraintsByField: Record<string, Constraint[]> = {};
+      for (const constraint of constraints) {
+        if (!constraintsByField[constraint.dbField]) {
+          constraintsByField[constraint.dbField] = [];
+        }
+        constraintsByField[constraint.dbField].push(constraint);
+      }
+
+      // If all constraints are for the SAME field, combine them
+      const fieldKeys = Object.keys(constraintsByField);
+      if (fieldKeys.length === 1) {
+        const singleFieldConstraints = constraintsByField[fieldKeys[0]];
+        if (singleFieldConstraints.length > 1) {
+          // Combine all values from all constraints into ONE
+          const combinedValues: string[] = [];
+          for (const constraint of singleFieldConstraints) {
+            combinedValues.push(...constraint.values);
+          }
+          
+          console.log(`📊 MULTI-VALUE QUERY DETECTED: Same field (${singleFieldConstraints[0].field}) with values: ${JSON.stringify(combinedValues)}`);
+          
+          return {
+            type: 'count_filtered',
+            field: singleFieldConstraints[0].field,
+            value: combinedValues[0],
+            values: combinedValues,
+            multiValue: true,
+            dbField: singleFieldConstraints[0].dbField
+          };
+        }
+      }
+
+      // If different fields, return as compound
+      console.log(`📊 COMPOUND QUERY CONFIRMED: ${constraints.length} constraints found`);
+      return {
+        type: 'count_filtered',
+        constraints: constraints,
+        isCompound: true,
+        // Fallback to first constraint for legacy compatibility
+        field: constraints[0].field,
+        value: constraints[0].values[0],
+        values: constraints[0].values,
+        multiValue: constraints[0].multiValue,
+        dbField: constraints[0].dbField
+      };
+    }
+  }
+
+  // ------- If not compound or only one constraint found, proceed with regular single-field parsing -------
+  // DISTRIBUTION / BREAKDOWN -------
   if (/breakdown|distribution|statistic|stats\b|summarize|summary/i.test(clean)) {
     for (const [keyword, dbField] of Object.entries(QUERYABLE_FIELDS)) {
       if (clean.includes(keyword)) {
@@ -153,6 +402,7 @@ export const parseAnalyticalIntent = (query: string): ParsedIntent => {
   let detectedField: string | undefined;
   let detectedValue: string | undefined;
   let detectedDbField: string | undefined;
+  let detectedValues: string[] | undefined;
 
   // ===== PATTERN A: "VALUE as FIELD" (inverted) =====
   // e.g. "have IoT as domain", "have good as status", "IoT as their domain"
@@ -173,6 +423,13 @@ export const parseAnalyticalIntent = (query: string): ParsedIntent => {
           detectedValue = candidate;
           detectedDbField = dbField;
           console.log(`📊 Pattern A matched: "${candidate}" as ${keyword}`);
+          
+          // Check if candidate contains multiple values (and/or/,/)
+          const multiVals = extractMultipleValues(match[1]);
+          if (multiVals.length > 1) {
+            detectedValues = multiVals;
+            console.log(`📊 Pattern A multi-value detected: ${JSON.stringify(multiVals)}`);
+          }
           break;
         }
       }
@@ -185,10 +442,13 @@ export const parseAnalyticalIntent = (query: string): ParsedIntent => {
   if (!detectedValue) {
     for (const [keyword, dbField] of Object.entries(QUERYABLE_FIELDS)) {
       const normalPatterns = [
-        new RegExp(`${keyword}\\s+(?:as|of|is|=|:|being)\\s+["']?([\\w\\s&/-]+?)["']?(?:\\s|$)`, 'i'),
-        new RegExp(`(?:with|having|whose)\\s+${keyword}\\s+(?:as|of|is|=|:)?\\s*["']?([\\w\\s&/-]+?)["']?(?:\\s|$)`, 'i'),
+        // Capture everything after "is/as/etc" until question mark or end 
+        new RegExp(`${keyword}\\s+(?:as|of|is|=|:|being)\\s+["']?([\\w\\s&,/-]+?)["']?(?:\\?|$)`, 'i'),
+        new RegExp(`(?:with|having|whose)\\s+${keyword}\\s+(?:as|of|is|=|:)?\\s*["']?([\\w\\s&,/-]+?)["']?(?:\\?|$)`, 'i'),
         // "domain IoT" (field followed directly by value)
-        new RegExp(`${keyword}\\s+["']?([\\w\\s&/-]+?)["']?(?:\\s|$)`, 'i'),
+        new RegExp(`${keyword}\\s+["']?([\\w\\s&,/-]+?)["']?(?:\\?|$)`, 'i'),
+        // "have ... VALUE FIELD" (e.g. "have IoT domain")
+        new RegExp(`have\\s+["']?([\\w\\s&,/-]+?)["']?\\s+${keyword}(?:\\?|\\s|$)`, 'i'),
       ];
 
       for (const pattern of normalPatterns) {
@@ -200,6 +460,13 @@ export const parseAnalyticalIntent = (query: string): ParsedIntent => {
             detectedValue = candidate;
             detectedDbField = dbField;
             console.log(`📊 Pattern B matched: ${keyword} = "${candidate}"`);
+            
+            // Check if candidate contains multiple values (and/or/,/)
+            const multiVals = extractMultipleValues(match[1]);
+            if (multiVals.length > 1) {
+              detectedValues = multiVals;
+              console.log(`📊 Pattern B multi-value detected: ${JSON.stringify(multiVals)}`);
+            }
             break;
           }
         }
@@ -222,6 +489,13 @@ export const parseAnalyticalIntent = (query: string): ParsedIntent => {
           detectedValue = candidate;
           detectedDbField = dbField;
           console.log(`📊 Pattern C matched: ${keyword} = "${candidate}"`);
+          
+          // Check if candidate contains multiple values (and/or/,/)
+          const multiVals = extractMultipleValues(match[1]);
+          if (multiVals.length > 1) {
+            detectedValues = multiVals;
+            console.log(`📊 Pattern C multi-value detected: ${JSON.stringify(multiVals)}`);
+          }
           break;
         }
       }
@@ -239,7 +513,7 @@ export const parseAnalyticalIntent = (query: string): ParsedIntent => {
         if (/college|university|institute|iit|nit|vit|bits|psg|srm/i.test(clean)) {
           detectedField = 'college';
           detectedDbField = 'college';
-        } else if (/domain|field|area|subject/i.test(clean)) {
+        } else if (/domain|field|area|subject|iot|ai|ml|vision|nlp|blockchain|cloud|mobile|web|data/i.test(clean)) {
           detectedField = 'domain';
           detectedDbField = 'domain';
         } else {
@@ -249,6 +523,13 @@ export const parseAnalyticalIntent = (query: string): ParsedIntent => {
         }
         detectedValue = candidate;
         console.log(`📊 Pattern C2 matched: ${detectedField} = "${candidate}"`);
+        
+        // Check if candidate contains multiple values (and/or/,/)
+        const multiVals = extractMultipleValues(prepMatch[1]);
+        if (multiVals.length > 1) {
+          detectedValues = multiVals;
+          console.log(`📊 Pattern C2 multi-value detected: ${JSON.stringify(multiVals)}`);
+        }
       }
     }
   }
@@ -256,25 +537,52 @@ export const parseAnalyticalIntent = (query: string): ParsedIntent => {
   // ===== PATTERN D: Known value without field keyword =====
   // e.g. "how many worklets are average", "count of good worklets"
   if (!detectedValue) {
+    // First pass: collect ALL known statuses in the query
+    const foundStatuses: string[] = [];
     for (const status of KNOWN_STATUSES) {
-      if (clean.includes(status)) {
-        detectedField = 'status';
-        detectedValue = status;
-        detectedDbField = 'status';
-        console.log(`📊 Pattern D (known status) matched: "${status}"`);
-        break;
+      if (new RegExp(`\\b${status}\\b`, 'i').test(clean)) {
+        foundStatuses.push(status);
       }
     }
+    
+    if (foundStatuses.length >= 2) {
+      // Multi-status query detected
+      detectedField = 'status';
+      detectedValue = foundStatuses[0];
+      detectedDbField = 'status';
+      detectedValues = foundStatuses;
+      console.log(`📊 Pattern D (multi-status) matched: ${JSON.stringify(foundStatuses)}`);
+    } else if (foundStatuses.length === 1) {
+      // Single status query
+      detectedField = 'status';
+      detectedValue = foundStatuses[0];
+      detectedDbField = 'status';
+      console.log(`📊 Pattern D (known status) matched: "${foundStatuses[0]}"`);
+    }
   }
+
+  // Also check for multiple stages
   if (!detectedValue) {
+    const foundStages: string[] = [];
     for (const stage of KNOWN_STAGES) {
-      if (clean.includes(stage) && !KNOWN_STATUSES.includes(stage)) {
-        detectedField = 'stage';
-        detectedValue = stage;
-        detectedDbField = 'stage';
-        console.log(`📊 Pattern D (known stage) matched: "${stage}"`);
-        break;
+      if (new RegExp(`\\b${stage}\\b`, 'i').test(clean) && !KNOWN_STATUSES.includes(stage)) {
+        foundStages.push(stage);
       }
+    }
+    
+    if (foundStages.length >= 2) {
+      // Multi-stage query detected
+      detectedField = 'stage';
+      detectedValue = foundStages[0];
+      detectedDbField = 'stage';
+      detectedValues = foundStages;
+      console.log(`📊 Pattern D (multi-stage) matched: ${JSON.stringify(foundStages)}`);
+    } else if (foundStages.length === 1) {
+      // Single stage query
+      detectedField = 'stage';
+      detectedValue = foundStages[0];
+      detectedDbField = 'stage';
+      console.log(`📊 Pattern D (known stage) matched: "${foundStages[0]}"`);
     }
   }
 
@@ -294,14 +602,65 @@ export const parseAnalyticalIntent = (query: string): ParsedIntent => {
     }
   }
 
+  // ------- Check for multiple values before returning -------
+  // e.g., "good and bad", "good/bad", "good, bad, and average"
+  if (!detectedValues && detectedValue) {
+    // If detectedValues weren't already set (e.g., by Pattern D), try to find more field values
+    if (detectedField && detectedDbField) {
+      // Look in the ORIGINAL query to see if there are related multi-value patterns with the same field
+      // e.g., query="how many have good and bad status", field="status"
+      // We want to extract all known values of this field
+      let checkList = detectedField === 'status' ? KNOWN_STATUSES : (detectedField === 'stage' ? KNOWN_STAGES : []);
+      const foundVals: string[] = [];
+      
+      for (const val of checkList) {
+        if (new RegExp(`\\b${val}\\b`, 'i').test(clean)) {
+          foundVals.push(val);
+        }
+      }
+      
+      if (foundVals.length > 1) {
+        detectedValues = foundVals;
+        console.log(`📊 Multi-value detected from known list: ${JSON.stringify(foundVals)}`);
+      }
+    }
+  }
+
+  // ------- Check for compound queries (multiple field constraints) -------
+  // Note: This is now handled upfront for " and " separated queries
+  // This section only handles edge cases where constraints might be missed
+
   // ------- Return parsed result -------
+
   if (detectedField && detectedValue && detectedDbField) {
-    return { type: 'count_filtered', field: detectedField, value: detectedValue, dbField: detectedDbField };
+    const result: ParsedIntent = { 
+      type: 'count_filtered', 
+      field: detectedField, 
+      value: detectedValue, 
+      dbField: detectedDbField 
+    };
+    if (detectedValues && detectedValues.length > 1) {
+      result.values = detectedValues;
+      result.multiValue = true;
+    }
+    return result;
   }
 
   // If we have a value but no field, return as count_filtered with auto-detect marker
   if (detectedValue && !detectedField) {
-    return { type: 'count_filtered', field: 'auto', value: detectedValue, dbField: 'auto' };
+    const result: ParsedIntent = { 
+      type: 'count_filtered', 
+      field: 'auto', 
+      value: detectedValue, 
+      dbField: 'auto' 
+    };
+    // For auto-detect, only use multi-values if they're clean and don't include stop words
+    const cleanMulti = extractMultipleValues(detectedValue);
+    if (cleanMulti.length > 1) {
+      result.values = cleanMulti;
+      result.multiValue = true;
+    }
+    return result;
   }
 
   // ------- TRUE total count (only if no extra meaningful words) -------
@@ -350,22 +709,88 @@ export const executeAnalyticalQuery = async (query: string): Promise<AnalyticalR
         };
       }
 
-      // ----- FILTERED COUNT -----
+      // ----- FILTERED COUNT (including multi-value) -----
       case 'count_filtered': {
+        // ===== HANDLE COMPOUND QUERIES (Multiple Field Constraints) =====
+        if (intent.isCompound && intent.constraints && intent.constraints.length > 1) {
+          console.log(`📊 COMPOUND QUERY: Processing ${intent.constraints.length} constraints`);
+          
+          // Build $and filter combining all constraints
+          const andConditions: Record<string, any>[] = [];
+          const constraintDescriptions: string[] = [];
+
+          for (const constraint of intent.constraints) {
+            const field = constraint.dbField;
+            let condition: Record<string, any> = {};
+
+            if (constraint.multiValue && constraint.values.length > 1) {
+              // Multiple values in this constraint → use $in with regex patterns
+              const regexPatterns = constraint.values.map(v => new RegExp(`^${v}$|${v}`, 'i'));
+              condition[field] = { $in: regexPatterns };
+              constraintDescriptions.push(`${constraint.field} as **${constraint.values.join('**, **')}**`);
+            } else {
+              // Single value in this constraint
+              condition[field] = { $regex: new RegExp(constraint.values[0], 'i') };
+              constraintDescriptions.push(`${constraint.field} as **${constraint.values[0]}**`);
+            }
+
+            andConditions.push(condition);
+          }
+
+          // Build the compound filter
+          const compoundFilter = { $and: andConditions };
+          console.log(`📊 Compound filter: ${JSON.stringify(compoundFilter)}`);
+
+          const count = await Project.countDocuments(compoundFilter);
+          const percentage = ((count / totalWorklets) * 100).toFixed(1);
+
+          // Get samples
+          const samples = await Project.find(compoundFilter)
+            .select('workletId workletTitle')
+            .limit(5)
+            .lean();
+
+          const sampleText = samples.length > 0
+            ? `\n\nSome examples: ${samples.map(s => `Worklet ${s.workletId} (${s.workletTitle})`).join(', ')}${count > 5 ? `, and ${count - 5} more.` : '.'}`
+            : '';
+
+          if (count === 0) {
+            return {
+              isAnalytical: true,
+              answer: `No worklets found matching **${constraintDescriptions.join('** AND **')}** out of ${totalWorklets} total worklets.`,
+              data: { count: 0, total: totalWorklets, constraints: intent.constraints }
+            };
+          }
+
+          const answerMessage = `There are **${count}** worklets with ${constraintDescriptions.join(' AND ')} out of ${totalWorklets} total worklets (**${percentage}%**).${sampleText}`;
+          return {
+            isAnalytical: true,
+            answer: answerMessage,
+            data: { count, total: totalWorklets, percentage: parseFloat(percentage), constraints: intent.constraints, samples }
+          };
+        }
+
+        // ===== SINGLE/MULTI-VALUE QUERIES (Original Logic) =====
         let searchField = intent.dbField!;
         let displayField = intent.field!;
-        const searchValue = intent.value!;
+        const searchValues = intent.multiValue && intent.values ? intent.values : [intent.value!];
+        const isMutiValue = searchValues.length > 1;
+
+        console.log(`📊 Executing filtered count: field=${searchField}, values=${JSON.stringify(searchValues)}, multiValue=${intent.multiValue}`);
 
         // AUTO-DETECT: If field is 'auto', search across all fields to find the best match
         if (searchField === 'auto') {
-          console.log(`📊 Auto-detecting field for value: "${searchValue}"`);
+          console.log(`📊 Auto-detecting field for values: ${JSON.stringify(searchValues)}`);
           const fieldsToSearch = ['status', 'stage', 'domain', 'college', 'mentors', 'students', 'professors'];
           let bestField = '';
           let bestCount = 0;
 
           for (const field of fieldsToSearch) {
+            // Create regex OR filter for all values
+            const regexPatterns = searchValues.map(v => new RegExp(v, 'i'));
             const filter: Record<string, any> = {};
-            filter[field] = { $regex: new RegExp(searchValue, 'i') };
+            filter[field] = { $in: regexPatterns };
+            
             const count = await Project.countDocuments(filter);
             console.log(`📊   ${field}: ${count} matches`);
             if (count > bestCount) {
@@ -382,14 +807,23 @@ export const executeAnalyticalQuery = async (query: string): Promise<AnalyticalR
             // No matches found in any field
             return {
               isAnalytical: true,
-              answer: `No worklets found matching "**${searchValue}**" in any field (status, stage, domain, college, mentors, students, professors). There are **${totalWorklets}** total worklets in the database.\n\nTry asking for a breakdown, e.g., "Show me the domain distribution" or "What are the different statuses?"`,
-              data: { count: 0, total: totalWorklets, searchValue }
+              answer: `No worklets found matching ${isMutiValue ? `**${searchValues.join('**, **')}**` : `**${searchValues[0]}**`} in any field (status, stage, domain, college, mentors, students, professors). There are **${totalWorklets}** total worklets in the database.\n\nTry asking for a breakdown, e.g., "Show me the domain distribution" or "What are the different statuses?"`,
+              data: { count: 0, total: totalWorklets, searchValues }
             };
           }
         }
 
-        const filter: Record<string, any> = {};
-        filter[searchField] = { $regex: new RegExp(searchValue, 'i') };
+        // Build filter for single or multiple values
+        let filter: Record<string, any> = {};
+        if (isMutiValue) {
+          // Multi-value: use $in with regex patterns
+          const regexPatterns = searchValues.map(v => new RegExp(`^${v}$|${v}`, 'i')); // exact or partial match
+          filter[searchField] = { $in: regexPatterns };
+          console.log(`📊 Multi-value filter created for ${JSON.stringify(searchValues)}`);
+        } else {
+          // Single value: keep original regex logic
+          filter[searchField] = { $regex: new RegExp(searchValues[0], 'i') };
+        }
 
         const count = await Project.countDocuments(filter);
         const percentage = ((count / totalWorklets) * 100).toFixed(1);
@@ -409,17 +843,27 @@ export const executeAnalyticalQuery = async (query: string): Promise<AnalyticalR
           // Get actual unique values for this field to suggest
           const uniqueVals = await Project.distinct(searchField);
           const suggestions = uniqueVals.slice(0, 10).map((v: any) => String(v)).join(', ');
+          const valueStr = isMutiValue ? `${searchValues.join(', ')}` : searchValues[0];
           return {
             isAnalytical: true,
-            answer: `No worklets found with ${displayField} matching "**${searchValue}**" out of ${totalWorklets} total worklets.\n\nAvailable ${displayField} values are: ${suggestions}`,
-            data: { count: 0, total: totalWorklets, field: displayField, value: searchValue, availableValues: uniqueVals }
+            answer: `No worklets found with ${displayField} matching "**${valueStr}**" out of ${totalWorklets} total worklets.\n\nAvailable ${displayField} values are: ${suggestions}`,
+            data: { count: 0, total: totalWorklets, field: displayField, values: searchValues, availableValues: uniqueVals }
           };
+        }
+
+        // Build answer based on single or multi-value
+        let answerMessage: string;
+        if (isMutiValue) {
+          const valueStr = searchValues.join('**, **');
+          answerMessage = `There are **${count}** worklets with ${displayField} as **${valueStr}** out of ${totalWorklets} total worklets (**${percentage}%**).${sampleText}`;
+        } else {
+          answerMessage = `There are **${count}** worklets with ${displayField} matching "**${searchValues[0]}**" out of ${totalWorklets} total worklets (**${percentage}%**).${sampleText}`;
         }
 
         return {
           isAnalytical: true,
-          answer: `There are **${count}** worklets with ${displayField} matching "**${searchValue}**" out of ${totalWorklets} total worklets (**${percentage}%**).${sampleText}`,
-          data: { count, total: totalWorklets, percentage: parseFloat(percentage), field: displayField, value: searchValue, samples }
+          answer: answerMessage,
+          data: { count, total: totalWorklets, percentage: parseFloat(percentage), field: displayField, values: searchValues, samples }
         };
       }
 
