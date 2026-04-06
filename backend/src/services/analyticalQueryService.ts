@@ -177,16 +177,21 @@ export const parseAnalyticalIntent = (query: string): ParsedIntent => {
     // Split by " and " OR identify boundaries between prep + "with/have"
     let segments: string[] = [];
     
-    if (hasAndSeparator) {
-      segments = clean.split(/\s+and\s+/);
-    } else if (hasMultipleFieldIndicators) {
+    // ⚠️ PRIORITY: Check hasMultipleFieldIndicators FIRST
+    // This prioritizes patterns like "from VIT have good and poor status"
+    // where " and " connects values of the SAME field, not different fields
+    if (hasMultipleFieldIndicators) {
       // Pattern: "from/in/at VALUE with/have VALUE FIELD"
       // Split after first "with" or "have" keyword
       const splitMatch = clean.match(/^(.*?)\s+(?:with|have|having)\s+(.+)$/i);
       if (splitMatch) {
         segments = [splitMatch[1], splitMatch[2]];
-        console.log(`📊 Multi-field pattern detected: ["${segments[0]}", "${segments[1]}"]`);
+        console.log(`📊 Multi-field pattern detected (multi-indicators priority): ["${segments[0]}", "${segments[1]}"]`);
       }
+    } else if (hasAndSeparator) {
+      // Only split by " and " if NOT a multi-field pattern
+      segments = clean.split(/\s+and\s+/);
+      console.log(`📊 Multi-value same field: split by " and "`);
     }
     
     if (segments.length > 0) {
@@ -203,8 +208,8 @@ export const parseAnalyticalIntent = (query: string): ParsedIntent => {
 
         let segmentDetectedField: string | undefined;
         let segmentDetectedValue: string | undefined;
+        let segmentDetectedValues: string[] | undefined;  // NEW: track multiple values
         let segmentDetectedDbField: string | undefined;
-        let segmentDetectedValues: string[] | undefined;
 
         // First, check if this segment is about a known college or domain
         if (!segmentDetectedValue) {
@@ -271,7 +276,12 @@ export const parseAnalyticalIntent = (query: string): ParsedIntent => {
                 segmentDetectedField = keyword;
                 segmentDetectedValue = candidate;
                 segmentDetectedDbField = dbField;
-                console.log(`📊     Segment pattern 1 matched: ${keyword} = "${candidate}"`);
+                // Check if candidate has multiple values (e.g., "good and poor")
+                const multiVals = extractMultipleValues(candidate);
+                if (multiVals.length > 0) {
+                  segmentDetectedValues = multiVals;
+                }
+                console.log(`📊     Segment pattern 1 matched: ${keyword} = "${candidate}"${segmentDetectedValues ? ` (multi: ${JSON.stringify(segmentDetectedValues)})` : ''}`);
                 break;
               }
             }
@@ -286,7 +296,12 @@ export const parseAnalyticalIntent = (query: string): ParsedIntent => {
                   segmentDetectedField = keyword;
                   segmentDetectedValue = candidate;
                   segmentDetectedDbField = dbField;
-                  console.log(`📊     Segment pattern 2 matched: ${keyword} = "${candidate}"`);
+                  // Check if candidate has multiple values (e.g., "good and poor")
+                  const multiVals = extractMultipleValues(candidate);
+                  if (multiVals.length > 0) {
+                    segmentDetectedValues = multiVals;
+                  }
+                  console.log(`📊     Segment pattern 2 matched: ${keyword} = "${candidate}"${segmentDetectedValues ? ` (multi: ${JSON.stringify(segmentDetectedValues)})` : ''}`);
                   break;
                 }
               }
@@ -302,7 +317,12 @@ export const parseAnalyticalIntent = (query: string): ParsedIntent => {
                   segmentDetectedField = keyword;
                   segmentDetectedValue = candidate;
                   segmentDetectedDbField = dbField;
-                  console.log(`📊     Segment pattern 3 matched: ${keyword} = "${candidate}"`);
+                  // Check if candidate has multiple values (e.g., "good and poor")
+                  const multiVals = extractMultipleValues(candidate);
+                  if (multiVals.length > 0) {
+                    segmentDetectedValues = multiVals;
+                  }
+                  console.log(`📊     Segment pattern 3 matched: ${keyword} = "${candidate}"${segmentDetectedValues ? ` (multi: ${JSON.stringify(segmentDetectedValues)})` : ''}`);
                   break;
                 }
               }
@@ -314,13 +334,22 @@ export const parseAnalyticalIntent = (query: string): ParsedIntent => {
 
         // If we found a constraint in this segment, add it
         if (segmentDetectedField && segmentDetectedValue && segmentDetectedDbField) {
-          // Check for multi-values (e.g., "good and poor" in the segment)
-          const multiVals = extractMultipleValues(segmentDetectedValue);
+          // If we already have multiple values (e.g., from known status/stage collection), use those
+          let finalValues = segmentDetectedValues && segmentDetectedValues.length > 0 
+            ? segmentDetectedValues 
+            : [segmentDetectedValue];
+          
+          // Also check for multi-values within the value (e.g., "good and poor" in the segment)
+          if (!segmentDetectedValues) {
+            const multiVals = extractMultipleValues(segmentDetectedValue);
+            finalValues = multiVals.length > 0 ? multiVals : [segmentDetectedValue];
+          }
+          
           constraints.push({
             field: segmentDetectedField,
             dbField: segmentDetectedDbField,
-            values: multiVals.length > 0 ? multiVals : [segmentDetectedValue],
-            multiValue: multiVals.length > 1
+            values: finalValues,
+            multiValue: finalValues.length > 1
           });
         }
       }
